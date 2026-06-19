@@ -1,0 +1,920 @@
+* Melhorias de Acessibilidade e UX */
+
+/* Skip links para navegação por teclado */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: var(--accent);
+    color: var(--bg);
+    padding: 8px;
+    text-decoration: none;
+    border-radius: 4px;
+    z-index: 10000;
+    transition: top 0.3s;
+}
+
+.skip-link:focus {
+    top: 6px;
+}
+
+/* Melhor contraste para acessibilidade */
+.high-contrast {
+    --bg: #000000;
+    --text: #ffffff;
+    --muted: #cccccc;
+    --accent: #00ff00;
+    --card: rgba(255,255,255,0.1);
+}
+
+/* Indicadores de foco melhorados */
+button:focus,
+input:focus,
+select:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Estados de loading melhorados */
+.processing {
+    position: relative;
+    opacity: 0.7;
+}
+
+.processing::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--muted);
+    border-top: 2px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    transform: translateY(-50%);
+}
+
+/* Animações suaves */
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Melhorias nos modais */
+.modal {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-body {
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Indicadores de status melhorados */
+.status-indicator {
+    transition: all 0.3s ease;
+}
+
+.status-indicator:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* Melhorias nos botões */
+.talk-btn {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.talk-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.talk-btn:hover::before {
+    width: 100px;
+    height: 100px;
+}
+
+/* Melhorias na responsividade */
+@media (max-width: 768px) {
+    .canvas-area {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .sidebar {
+        order: -1;
+    }
+    
+    .hero-img {
+        width: 100px;
+    }
+    
+    .input-row {
+        padding: 8px;
+    }
+    
+    .talk-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main {
+        padding: 16px;
+    }
+    
+    .quick-commands {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .quick-commands button {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Melhorias para modo escuro automático */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0b0f12;
+        --text: #e6f0f2;
+        --muted: #9fb3bd;
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #f4f7f9;
+        --text: #102027;
+        --muted: #415a64;
+    }
+}
+
+/* Redução de movimento para usuários sensíveis */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .loading-spinner {
+        animation: none;
+        border: 4px solid var(--accent);
+    }
+}
+
+/* Melhorias nos tooltips */
+[title] {
+    position: relative;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg);
+    color: var(--text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    border: 1px solid var(--muted);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Estados de erro */
+.error {
+    border-color: #ff4444 !important;
+    background: rgba(255, 68, 68, 0.1) !important;
+}
+
+.error-message {
+    color: #ff4444;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* Estados de sucesso */
+.success {
+    border-color: #44ff44 !important;
+    background: rgba(68, 255, 68, 0.1) !important;
+}
+
+.success-message {
+    color: #44ff44;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* Melhorias na tipografia */
+.logo {
+    text-shadow: 0 0 20px var(--accent);
+}
+
+/* Scroll customizado */
+.chat-window::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-window::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+}
+
+.chat-window::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.chat-window::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-2);
+}
+
+/* Melhorias nos cards */
+.bubble .card {
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+}
+
+/* Indicador de digitação melhorado */
+.typing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.typing .dot:nth-child(1) { animation-delay: 0s; }
+.typing .dot:nth-child(2) { animation-delay: 0.2s; }
+.typing .dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Melhorias no tema neon */
+[data-theme="neon"] .logo {
+    animation: neonGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes neonGlow {
+    from {
+        text-shadow: 0 0 20px var(--accent), 0 0 30px var(--accent), 0 0 40px var(--accent);
+    }
+    to {
+        text-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent), 0 0 30px var(--accent);
+    }
+}
+
+/* Melhorias na acessibilidade de cores */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Melhorias para impressão */
+@media print {
+    .header-controls,
+    .input-row,
+    .quick-commands,
+    .sidebar {
+        display: none !important;
+    }
+    
+    .chat-window {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        max-height: none !important;
+    }
+    
+    .message {
+        break-inside: avoid;
+    }
+}
+
+
+
+
+/* ========== NOVOS ESTILOS PARA FUNCIONALIDADES ADICIONADAS ========== */
+
+/* Abas de configuração */
+.settings-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.tab-btn {
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.tab-btn:hover {
+    color: var(--text);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Pesquisa de histórico */
+.search-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 0 12px rgba(0,188,212,0.2);
+}
+
+.search-results {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-result-item {
+    padding: 10px;
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.search-result-item:hover {
+    background: rgba(255,255,255,0.05);
+    transform: translateX(4px);
+}
+
+.result-sender {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.result-sender.jarvis {
+    color: var(--accent);
+}
+
+.result-sender.user {
+    color: var(--accent-2);
+}
+
+.result-text {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.4;
+    word-break: break-word;
+    margin-bottom: 4px;
+}
+
+.result-time {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.no-results {
+    text-align: center;
+    color: var(--muted);
+    padding: 20px;
+    font-size: 14px;
+}
+
+/* Gerenciamento de comandos personalizados */
+.commands-list {
+    max-height: 350px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.command-item-settings {
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.command-item-settings:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--accent);
+}
+
+.command-details {
+    flex: 1;
+}
+
+.command-keyword-settings {
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.command-response-preview {
+    font-size: 12px;
+    color: var(--muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.command-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.edit-cmd-btn,
+.delete-cmd-settings-btn {
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+}
+
+.edit-cmd-btn:hover {
+    background: rgba(0,188,212,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.delete-cmd-settings-btn:hover {
+    background: rgba(255,68,68,0.1);
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+/* Sidebar - Comandos personalizados */
+.custom-command-item {
+    padding: 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    transition: all 0.3s ease;
+}
+
+.custom-command-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.command-info {
+    flex: 1;
+}
+
+.command-keyword {
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 12px;
+}
+
+.command-info small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.delete-cmd-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+}
+
+.delete-cmd-btn:hover {
+    color: #ff4444;
+    transform: scale(1.1);
+}
+
+/* Modal para adicionar comando */
+textarea {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 80px;
+    transition: all 0.3s ease;
+    margin-bottom: 12px;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 0 12px rgba(0,188,212,0.2);
+}
+
+/* Inputs de texto no modal */
+.modal-content input[type="text"],
+.modal-content textarea {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.modal-content label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text);
+    font-size: 13px;
+}
+
+/* Melhorias no botão primário */
+.primary-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,188,212,0.3);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
+}
+
+/* Scroll customizado para search results */
+.search-results::-webkit-scrollbar,
+.commands-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.search-results::-webkit-scrollbar-track,
+.commands-list::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+}
+
+.search-results::-webkit-scrollbar-thumb,
+.commands-list::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.search-results::-webkit-scrollbar-thumb:hover,
+.commands-list::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-2);
+}
+
+/* Responsividade para modais em mobile */
+@media (max-width: 768px) {
+    .modal-body {
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .search-results,
+    .commands-list {
+        max-height: 300px;
+    }
+
+    .command-response-preview {
+        max-width: 150px;
+    }
+
+    .settings-tabs {
+        flex-wrap: wrap;
+    }
+
+    .tab-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}
+
+
+
+
+/* ===== ESTILOS PARA MELHORIAS AVANÇADAS - VERSÃO 3.5 ===== */
+
+/* Sugestões Inteligentes */
+#suggestions-box {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.suggestion-item:hover {
+    background: rgba(0, 188, 212, 0.3) !important;
+    padding-left: 16px;
+}
+
+/* Ações Rápidas */
+#quick-actions {
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.quick-action {
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.quick-action:hover {
+    background: rgba(0, 188, 212, 0.4) !important;
+    box-shadow: 0 0 8px rgba(0, 188, 212, 0.5);
+    transform: translateY(-2px);
+}
+
+.quick-action:active {
+    transform: translateY(0);
+}
+
+/* Preview de Voz */
+#voice-preview {
+    animation: slideUp 0.3s ease-out;
+    box-shadow: 0 0 12px rgba(0, 188, 212, 0.3);
+}
+
+#voice-preview strong {
+    color: var(--accent);
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* Animações de Transição */
+.message {
+    animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsividade para Mobile */
+@media (max-width: 768px) {
+    #suggestions-box {
+        bottom: 80px;
+        max-width: calc(100% - 20px);
+    }
+
+    #voice-preview {
+        bottom: 80px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+
+    #quick-actions {
+        flex-direction: column;
+    }
+
+    .quick-action {
+        width: 100%;
+    }
+}
+
+/* Efeito de Digitação Melhorado */
+.typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        opacity: 0.3;
+        transform: translateY(0);
+    }
+    30% {
+        opacity: 1;
+        transform: translateY(-10px);
+    }
+}
+
+/* Melhorias no Modal */
+.modal-content {
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Botão de Exportação */
+#export-chat-btn {
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+#export-chat-btn:hover {
+    background: rgba(0, 188, 212, 0.4) !important;
+    box-shadow: 0 0 8px rgba(0, 188, 212, 0.5);
+}
+
+/* Melhorias na Barra de Status */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Scroll Suave */
+html {
+    scroll-behavior: smooth;
+}
+
+#chat-window {
+    scroll-behavior: smooth;
+}
+
+/* Melhorias de Contraste */
+.message.user {
+    background: rgba(0, 188, 212, 0.1);
+    border-left: 3px solid var(--accent);
+}
+
+.message.jarvis {
+    background: rgba(100, 200, 255, 0.05);
+    border-left: 3px solid var(--accent);
+}
+
+/* Efeito Glow em Elementos Interativos */
+button:hover,
+input:hover,
+textarea:hover {
+    box-shadow: 0 0 8px rgba(0, 188, 212, 0.3);
+}
+
+/* Melhorias em Cards */
+.card {
+    background: rgba(0, 188, 212, 0.05);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
+    animation: cardSlideIn 0.3s ease-out;
+}
+
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
