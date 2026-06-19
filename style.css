@@ -1,0 +1,144 @@
+/* Fonte e variáveis */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap");
+
+:root{
+    --bg:#0b0f12;
+    --card: rgba(255,255,255,0.04);
+    --text:#e6f0f2;
+    --muted:#9fb3bd;
+    --accent:#00bcd4;
+    --accent-2:#7c4dff;
+    --radius:14px;
+    --glass: blur(8px);
+    --shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+
+/* Themes */
+[data-theme="light"]{
+    --bg:#f4f7f9;
+    --card: rgba(12,18,22,0.03);
+    --text:#102027;
+    --muted:#415a64;
+    --accent:#00796b;
+}
+[data-theme="blue"]{
+    --bg:#071229;
+    --card: rgba(255,255,255,0.02);
+    --text:#e7f4ff;
+    --muted:#98b5d0;
+    --accent:#2196f3;
+}
+[data-theme="neon"]{
+    --bg: linear-gradient(135deg,#041021 0%,#071223 50%);
+    --card: rgba(255,255,255,0.02);
+    --text:#e6fff7;
+    --muted:#9ef0ff;
+    --accent: #00f0ff;
+    --accent-2: #ff22dd;
+}
+
+/* Base */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    transition: background .35s ease, color .25s ease;
+}
+
+/* Loading */
+.loading-screen{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:9999;
+}
+.loading-screen.hidden{opacity:0;pointer-events:none}
+.loading-spinner{
+    width:48px;height:48px;border-radius:50%;border:4px solid rgba(255,255,255,0.06);border-top-color:var(--accent);animation:spin 1s linear infinite;margin-bottom:10px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Layout */
+.main{min-height:100vh;padding:28px;display:flex;flex-direction:column;gap:18px}
+.header{display:flex;justify-content:flex-end;gap:12px;align-items:center}
+.status-indicator{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--card);border-radius:88px}
+.status-dot{width:10px;height:10px;border-radius:50%}
+.status-dot.offline{background:#ff4d4d;box-shadow:0 0 10px #ff4d4d}
+.status-dot.online{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.status-dot.listening{background:var(--accent);box-shadow:0 0 14px var(--accent);animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2);opacity:.8}}
+
+.canvas-area{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:8px}
+.hero-img{width:140px;border-radius:12px;box-shadow:var(--shadow);margin-bottom:8px}
+.logo{letter-spacing:8px;color:var(--accent);margin:4px 0 0;font-weight:700}
+.tagline{color:var(--muted);font-size:14px;margin-top:6px}
+
+/* Interaction area */
+.interaction-area{display:flex;flex-direction:column;gap:12px}
+.chat-window{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    padding:14px;border-radius:var(--radius);min-height:380px;max-height:60vh;overflow:auto;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:12px;
+}
+
+/* Message */
+.message{display:flex;align-items:flex-end;gap:10px;max-width:80%;animation:fadeIn .18s ease}
+.message.jarvis{align-self:flex-start}
+.message.user{align-self:flex-end;flex-direction:row-reverse}
+
+.avatar{
+    width:40px;height:40px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid rgba(255,255,255,0.04);
+}
+.bubble{
+    padding:10px 14px;border-radius:16px;line-height:1.35;font-size:14px;word-break:break-word;box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+.message.jarvis .bubble{background:var(--card);color:var(--text);border-bottom-left-radius:6px}
+.message.user .bubble{background:var(--accent);color:var(--bg);border-bottom-right-radius:6px}
+
+/* Typing */
+.typing .dot{display:inline-block;width:6px;height:6px;background:rgba(255,255,255,0.25);border-radius:50%;margin-right:4px;animation:blink 1s infinite}
+@keyframes blink{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+
+/* Input row */
+.input-row{display:flex;gap:10px;align-items:center;padding:10px;background:var(--card);border-radius:12px}
+.talk-btn{width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:18px;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,0.45)}
+.talk-btn.listening{box-shadow:0 0 30px var(--accent)}
+#text-input{flex:1;border:none;background:transparent;color:var(--text);outline:none;font-size:15px;padding:10px}
+.send-btn{width:44px;height:44px;border-radius:50%;border:none;background:var(--accent-2);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;cursor:pointer}
+
+/* Quick commands */
+.quick-commands{display:flex;gap:8px;flex-wrap:wrap}
+.quick-commands button{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:10px;color:var(--muted);cursor:pointer}
+.quick-commands button:hover{background:rgba(255,255,255,0.03)}
+
+/* Sidebar */
+.sidebar{display:flex;flex-direction:column;gap:12px}
+.widget{background:var(--card);padding:12px;border-radius:12px}
+.profile-preview{display:flex;gap:10px;align-items:center}
+.profile-preview img{width:56px;height:56px;border-radius:50%}
+.profile-preview #profile-name{font-weight:600}
+.small-btn{padding:8px 10px;border-radius:8px;border:none;background:transparent;color:var(--accent);cursor:pointer}
+.primary-btn{padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:#031016;cursor:pointer;margin-top:8px}
+
+/* Footer */
+.footer{text-align:center;color:var(--muted);margin-top:14px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:9998}
+.modal .modal-body{background:var(--card);width:420px;border-radius:12px;padding:12px}
+.modal header{display:flex;justify-content:space-between;align-items:center}
+.modal .modal-content{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+.modal.show{display:flex}
+
+/* Utilities */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:980px){
+    .canvas-area{grid-template-columns:1fr}
+    .sidebar{order:99}
+    .hero{order:100}
+}
+
+
