@@ -1,0 +1,200 @@
+!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>JARVIS — Assistente Futurista</title>
+    <meta name="description" content="JARVIS - Assistente Virtual Inteligente" />
+    <link rel="stylesheet" href="main.css" />
+    <link rel="shortcut icon" href="assets/avatar.png" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Inicializando JARVIS...</h2>
+            <p>Carregando módulos — segura firme.</p>
+        </div>
+    </div>
+
+    <main class="main">
+        <header class="header">
+            <div class="status-indicator" id="status-indicator">
+                <div class="status-dot offline"></div>
+                <span class="status-text">Offline</span>
+            </div>
+
+            <div class="header-controls">
+                <button id="search-history-btn" title="Pesquisar histórico (Ctrl+H)"><i class="fas fa-search"></i></button>
+                <button id="shortcut-btn" title="Atalhos (Ctrl+/)"><i class="fas fa-keyboard"></i></button>
+                <button id="profile-btn" title="Perfil"><i class="fas fa-user-circle"></i></button>
+                <button id="settings-btn" title="Configurações"><i class="fas fa-cog"></i></button>
+            </div>
+        </header>
+
+        <section class="canvas-area">
+            <div class="hero">
+                <img src="assets/giphy.gif" alt="Jarvis animation" class="hero-img" />
+                <h1 class="logo">J A R V I S</h1>
+                <p class="tagline">Assistente Virtual — Pergunte, mande, controle.</p>
+            </div>
+
+            <section class="interaction-area">
+                <div class="chat-window" id="chat-window" aria-live="polite"></div>
+
+                <div class="input-row">
+                    <button class="talk-btn" id="talk-btn" aria-label="Ativar microfone">
+                        <i class="fas fa-microphone-alt" id="mic-icon"></i>
+                    </button>
+
+                    <input id="text-input" type="text" placeholder="Digite sua mensagem..." autocomplete="off" />
+
+                    <button id="send-btn" class="send-btn" title="Enviar (Enter)">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+
+                <div class="quick-commands">
+                    <button class="quick-cmd" data-command="que horas são">Horário</button>
+                    <button class="quick-cmd" data-command="que dia é hoje">Data</button>
+                    <button class="quick-cmd" data-command="previsão do tempo em são paulo">Clima SP</button>
+                    <button class="quick-cmd" data-command="notícias de tecnologia">Notícias</button>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="widget">
+                    <h4>Perfil</h4>
+                    <div class="profile-preview">
+                        <img id="profile-avatar" src="assets/avatar.png" alt="avatar" />
+                        <div>
+                            <div id="profile-name">—</div>
+                            <small id="profile-sub">Diga: "meu nome é ..." para mudar</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h4>Comandos personalizados</h4>
+                    <div id="custom-list"></div>
+                    <button id="add-custom-btn" class="small-btn">Novo comando</button>
+                </div>
+
+                <div class="widget">
+                    <h4>Tema</h4>
+                    <select id="theme-select">
+                        <option value="dark">Escuro</option>
+                        <option value="light">Claro</option>
+                        <option value="blue">Azul</option>
+                        <option value="neon">Neon</option>
+                        <option value="red">Vermelho</option>
+                        <option value="white">Branco</option>
+                    </select>
+                </div>
+            </aside>
+        </section>
+
+        <footer class="footer">
+            <small>JARVIS — desenvolvido por você, aprimorado por mim. ;) </small>
+        </footer>
+    </main>
+
+    <!-- Modais / Dialogs -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-body">
+            <header><h3>Configurações</h3><button id="close-settings">&times;</button></header>
+            <div class="modal-content">
+                <div class="settings-tabs">
+                    <button class="tab-btn active" data-tab="voice">Voz</button>
+                    <button class="tab-btn" data-tab="commands">Comandos Personalizados</button>
+                </div>
+
+                <div id="voice-tab" class="tab-content active">
+                    <label>Velocidade da voz <span id="rate-value">1.0</span></label>
+                    <input id="voice-rate" type="range" min="0.5" max="2.0" step="0.1" value="1">
+
+                    <label>Tom da voz <span id="pitch-value">1.0</span></label>
+                    <input id="voice-pitch" type="range" min="0" max="2.0" step="0.1" value="1">
+
+                    <label>Volume <span id="volume-value">1.0</span></label>
+                    <input id="voice-volume" type="range" min="0" max="1" step="0.1" value="1">
+
+                    <div class="checkbox-row">
+                        <input id="auto-listen" type="checkbox"><label for="auto-listen">Escuta automática</label>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <input id="persist-chat" type="checkbox" checked><label for="persist-chat">Persistir conversa</label>
+                    </div>
+                </div>
+
+                <div id="commands-tab" class="tab-content">
+                    <div class="commands-list" id="commands-list">
+                        <!-- Comandos personalizados serão listados aqui -->
+                    </div>
+                    <button id="add-command-btn" class="primary-btn">Adicionar Comando</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal">
+        <div class="modal-body">
+            <header><h3>Perfil</h3><button id="close-profile">&times;</button></header>
+            <div class="modal-content">
+                <label>Nome</label>
+                <input id="profile-input" type="text" placeholder="Seu nome..." />
+                <label>Avatar (URL)</label>
+                <input id="avatar-input" type="text" placeholder="assets/avatar.png" />
+                <button id="save-profile" class="primary-btn">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="shortcuts-modal" class="modal">
+        <div class="modal-body">
+            <header><h3>Atalhos</h3><button id="close-shortcuts">&times;</button></header>
+            <div class="modal-content">
+                <ul>
+                    <li><strong>Enter</strong> - Enviar texto (apenas quando o campo de texto está focado)</li>
+                    <li><strong>Ctrl+K</strong> - Focar no campo de entrada</li>
+                    <li><strong>Ctrl+L</strong> - Limpar chat</li>
+                    <li><strong>Ctrl+H</strong> - Abrir pesquisa de histórico</li>
+                    <li><strong>Seta para cima/baixo</strong> - Navegar pelo histórico de mensagens</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="search-history-modal" class="modal">
+        <div class="modal-body">
+            <header><h3>Pesquisar Histórico</h3><button id="close-search-history">&times;</button></header>
+            <div class="modal-content">
+                <input id="search-input" type="text" placeholder="Digite para pesquisar..." class="search-input" />
+                <div id="search-results" class="search-results">
+                    <!-- Resultados da pesquisa serão exibidos aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-command-modal" class="modal">
+        <div class="modal-body">
+            <header><h3>Adicionar Comando Personalizado</h3><button id="close-add-command">&times;</button></header>
+            <div class="modal-content">
+                <label>Palavra-chave (ativação)</label>
+                <input id="command-keyword" type="text" placeholder="Ex: 'abrir spotify'" />
+                <label>Resposta/Ação</label>
+                <textarea id="command-response" placeholder="Ex: 'Abrindo Spotify para você...'"></textarea>
+                <button id="save-command-btn" class="primary-btn">Salvar Comando</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js" defer></script>
+    <script src="jarvis_enhancements.js" defer></script>
+</body>
+</html>
+
