@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XBot - Chatbot Inteligente | XByte Games Studios</title>
+    <meta name="description" content="XBot - Seu assistente virtual inteligente desenvolvido pela XByte Games Studios">
+    <meta name="keywords" content="chatbot, assistente virtual, XByte Games Studios, IA, arquitetura de computadores">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body class="light-mode">
+    <div class="header">
+        <div>
+            <h2>🤖 XBot <span class="status-indicator" aria-label="Status online"></span></h2>
+            <small>Assistente Virtual Inteligente</small>
+        </div>
+        <div>
+            <button id="btn-tema" title="Alternar tema" aria-label="Alternar entre modo claro e escuro">🌓</button>
+            <button id="btn-limpar" class="btn-secondary" title="Limpar conversa" aria-label="Limpar conversa">🗑️</button>
+            <button id="btn-exportar" class="btn-secondary" title="Exportar conversa" aria-label="Exportar conversa">💾</button>
+        </div>
+    </div>
+
+    <main class="chat-container">
+        <div class="chat-box" id="chat-box" role="log" aria-live="polite" aria-label="Área de conversa">
+            <!-- Mensagens aparecerão aqui -->
+        </div>
+        
+        <div class="input-container">
+            <input type="text" 
+                   id="input-mensagem" 
+                   placeholder="Digite sua mensagem..." 
+                   maxlength="500"
+                   autocomplete="off"
+                   aria-label="Campo de mensagem">
+            <button id="btn-enviar" class="btn-primary" aria-label="Enviar mensagem">
+                Enviar 📤
+            </button>
+        </div>
+        
+        <div class="controls">
+            <button id="btn-nome" class="btn-secondary" aria-label="Alterar nome do usuário">
+                👤 Alterar Nome
+            </button>
+            <button id="btn-ajuda" class="btn-secondary" aria-label="Mostrar ajuda">
+                ❓ Ajuda
+            </button>
+            <button id="btn-info" class="btn-secondary" aria-label="Informações sobre o bot">
+                ℹ️ Sobre
+            </button>
+        </div>
+    </main>
+
+    <footer>
+        <p>Desenvolvido com ❤️ por <strong>XByte Games Studios</strong></p>
+        <p>XBot v2.1 - Assistente Virtual Inteligente</p>
+        <small>© 2024 XByte Games Studios. Todos os direitos reservados.</small>
+    </footer>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
+
