@@ -1,4 +1,6 @@
-# XBot v2.1 — assistente educacional
+# XBot v2.1 — histórico da versão anterior
+
+> Este documento descreve a versão anterior. A versão atual é o [XBot v0.3.0 Beta](README_XBOT_V0.3.0.md), com autenticação, SQLite e revisão de segurança.
 
 **Branch:** [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual)
 
