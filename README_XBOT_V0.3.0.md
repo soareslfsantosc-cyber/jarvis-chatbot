@@ -1,8 +1,8 @@
 # XBot v0.3.0 Beta — guia atual
 
-**Branch:** [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual)
+**Branch:** [`xbot-v0.3.0`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-v0.3.0)
 **Código:** `xbot_melhorado/`
-**Documentação completa incluída no projeto:** [`xbot_melhorado/README_V0.3.0.md`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/blob/xbot-atual/xbot_melhorado/README_V0.3.0.md)
+**Manual recebido no ZIP:** [`xbot_melhorado/README_V0.3.0.md`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/blob/xbot-v0.3.0/xbot_melhorado/README_V0.3.0.md)
 
 O XBot é um chatbot educacional sobre arquitetura de computadores, programação e web design. A v0.3.0 Beta combina Flask e SQLite com um motor local de raciocínio e base de conhecimento; não há integração com API externa de IA generativa no código recebido.
 
@@ -13,6 +13,10 @@ O XBot é um chatbot educacional sobre arquitetura de computadores, programaçã
 - SQLite guarda contas, conhecimento, tentativas de autenticação e controles de sessão de visitantes.
 - Históricos de conversa e andamento de quizzes ficam na memória do processo e são perdidos quando ele reinicia; mantenha um processo se esses estados temporários forem importantes.
 - Interface HTML/CSS/JavaScript; `app.py` é o entrypoint principal. `app_improved.py` delega à mesma aplicação para compatibilidade.
+
+## Diferença em relação ao XBot 2.1
+
+O [XBot 2.1](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual), mantido separadamente, usa Flask, regras locais, quizzes e exercícios com histórico em memória. A v0.3.0 acrescenta autenticação, SQLite, teste de visitante acompanhado pelo servidor e controles de segurança mais completos. O comparativo dos três projetos está no [README principal](README.md).
 
 ## Segurança implementada
 
@@ -76,7 +80,7 @@ Nesta atualização, **306 testes passaram** usando as dependências declaradas 
 
 ## Diferença em relação ao Jarvis original
 
-O [Jarvis](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main) continua sendo o assistente browser-only em HTML/CSS/JavaScript, com voz e armazenamento local no navegador. O XBot acrescenta servidor, contas, base SQLite, regras/raciocínio local e controles de acesso. A comparação está no [README principal](README.md).
+O [Jarvis](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main) continua sendo o assistente browser-only em HTML/CSS/JavaScript, com voz e armazenamento local no navegador. O XBot acrescenta servidor, contas, base SQLite, regras/raciocínio local e controles de acesso. A comparação dos três está no [README principal](README.md).
 
 ## README anterior preservado
 
