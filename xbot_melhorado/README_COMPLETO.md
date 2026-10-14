@@ -1,11 +1,8 @@
-# 🤖 XBot v0.3.0 Beta — guia complementar
+# 🤖 XBot v2.1 - Assistente Virtual Inteligente
 
 **Desenvolvido pela XByte Games Studios**
 
 XBot é um chatbot inteligente com funcionalidades avançadas de educação, quiz interativo e base de conhecimento expandida sobre tecnologia, programação e arquitetura de computadores.
-
-> **Atualizado para a v0.3.0 Beta.** Configuração (`XBOT_*`), segurança, produção e testes estão no
-> [`README_V0.3.0.md`](README_V0.3.0.md). `python app.py` e `python app_improved.py` iniciam o mesmo aplicativo.
 
 ## ✨ Principais Funcionalidades
 
@@ -53,22 +50,14 @@ cd xbot_melhorado
 pip3 install -r requirements.txt
 ```
 
-3. **Gere e informe a chave secreta** (obrigatória — o XBot não inicia sem ela)
+3. **Execute a aplicação**
 ```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-export XBOT_SECRET_KEY="<cole a chave>"      # PowerShell: $env:XBOT_SECRET_KEY = "<cole a chave>"
-```
-   Ou copie `.env.example` para `.env` e preencha `XBOT_SECRET_KEY=`. Para apenas testar no seu
-   computador, use `XBOT_ENV=development` (chave temporária).
-
-4. **Execute a aplicação** (`app.py` e `app_improved.py` iniciam o mesmo app)
-```bash
-python3 app.py
+python3 app_improved.py
 ```
 
-5. **Acesse no navegador**
+4. **Acesse no navegador**
 ```
-http://127.0.0.1:5000
+http://localhost:5000
 ```
 
 ### Comandos Especiais
@@ -98,26 +87,14 @@ http://127.0.0.1:5000
 - `GET /exercicio/<categoria>` - Obter exercícios
 
 ### Endpoints de Dados
-- `GET /historico/<usuario>` - Histórico de conversas (só do próprio usuário logado)
-- `DELETE /limpar_historico/<usuario>` - Apaga uma conversa (só do próprio usuário logado)
-- `GET /estatisticas` - Estatísticas detalhadas (exige login)
-
-### Endpoints de Sessão
-- `GET /sessao` - Estado da sessão (autenticado, tempo restante do visitante) e token CSRF
-- `POST /registrar`, `POST /login`, `POST /logout` - Conta e sessão
-
-Requisições `POST`/`DELETE` precisam do cabeçalho `X-CSRF-Token` (a interface já envia). Detalhes no `README_V0.3.0.md`.
+- `GET /historico/<usuario>` - Histórico de conversas
+- `GET /estatisticas` - Estatísticas detalhadas
 
 ## 🏗️ Estrutura do Projeto
 
 ```
 xbot_melhorado/
-├── app.py                       # Aplicação Flask principal (única)
-├── app_improved.py              # Atalho: inicia o mesmo app do app.py
-├── wsgi.py                      # Entrada para waitress / gunicorn
-├── config.py, seguranca.py      # Configuração por ambiente e segurança
-├── database/                    # SQLite: conhecimento, usuários, visitantes
-├── tests/                       # Testes automatizados (python -m unittest discover)
+├── app_improved.py              # Aplicação Flask principal
 ├── knowledge_base.py            # Base de conhecimento original
 ├── knowledge_base_extended.py   # Base expandida com novos tópicos
 ├── templates/
@@ -126,9 +103,7 @@ xbot_melhorado/
 │   ├── style.css              # Estilos CSS modernos
 │   └── script.js              # JavaScript interativo
 ├── requirements.txt            # Dependências Python
-├── README.md                  # README v2.1 preservado
-├── README_V0.3.0.md           # Guia atual de configuração/segurança
-├── README_COMPLETO.md         # Guia complementar
+├── README.md                  # Este arquivo
 └── CHANGELOG.md               # Log de mudanças
 ```
 
@@ -136,9 +111,8 @@ xbot_melhorado/
 
 ### Backend
 - **Flask 2.3.3** - Framework web Python
-- **Flask-CORS** - CORS restrito às origens configuradas
-- **SQLite** (`sqlite3` da biblioteca padrão) - Conhecimento, contas e limites
-- **Python 3.11+** - Linguagem principal
+- **Flask-CORS** - Suporte a CORS
+- **Python 3.7+** - Linguagem principal
 
 ### Frontend
 - **HTML5** - Estrutura da página
@@ -185,22 +159,18 @@ xbot_melhorado/
 - ✅ Sanitização de entrada de dados
 - ✅ Limitação de tamanho de mensagens
 - ✅ Tratamento de erros HTTP
-- ✅ Validação de JSON (tipos incorretos retornam `400`, nunca `500`)
-- ✅ Proteção CSRF, CORS restrito e cookies `HttpOnly`/`SameSite`
-- ✅ Limite de tentativas de login e política de senha forte
-- ✅ Teste de 10 minutos do visitante controlado no servidor
-- ✅ Históricos privados: só o dono (logado) lê ou apaga
+- ✅ Validação de JSON
 
 ### Performance
 - ⚡ Tempo de resposta: <100ms
 - 🔄 Suporte a múltiplos usuários
 - 💾 Uso de memória otimizado
-- 🌐 CORS só para as origens de `XBOT_ALLOWED_ORIGINS`
+- 🌐 CORS configurado
 
 ## 🚀 Próximos Passos
 
 ### Funcionalidades Futuras
-- [x] Sistema de usuários com login
+- [ ] Sistema de usuários com login
 - [ ] Histórico persistente em banco
 - [ ] Mais categorias de quiz
 - [ ] Sistema de conquistas
@@ -211,14 +181,14 @@ xbot_melhorado/
 - [ ] Migração para banco de dados
 - [ ] Cache Redis
 - [ ] Containerização Docker
-- [x] Testes automatizados
+- [ ] Testes automatizados
 - [ ] CI/CD pipeline
 
 ## 📞 Suporte
 
 ### Contato
 - **Empresa**: XByte Games Studios
-- **Versão atual**: 0.3.0 Beta (base histórica: 2.1)
+- **Versão**: 2.1
 - **Tipo**: Assistente Virtual Inteligente
 
 ### Problemas Conhecidos
@@ -236,4 +206,5 @@ Para contribuir com o projeto:
 
 **Desenvolvido com ❤️ pela XByte Games Studios**
 
-*XBot v0.3.0 Beta — Transformando educação através da tecnologia*
+*XBot v2.1 - Transformando educação através da tecnologia*
+
