@@ -1,0 +1,36 @@
+# Licença personalizada para estudo, pesquisa e referência
+
+Copyright (c) 2026 soareslfsantosc-cyber
+
+Esta licença aplica-se ao material original contido no repositório `jarvis-chatbot`, incluindo o Jarvis original e as versões do XBot mantidas nas branches `main`, `xbot-atual` e `xbot-v0.3.0`, salvo quando um arquivo indicar expressamente outra licença.
+
+## 1. Permissão limitada
+
+O titular concede a qualquer pessoa que obtenha uma cópia do material original uma permissão gratuita, mundial, não exclusiva e limitada para acessar, executar, copiar, estudar, analisar, citar trechos, modificar e criar trabalhos derivados **somente para estudo, pesquisa, ensino ou referência sem fins comerciais**.
+
+Cópias e modificações podem ser compartilhadas apenas para esses mesmos fins não comerciais, desde que esta licença e os avisos de autoria sejam mantidos, e que cada destinatário receba os mesmos limites de uso.
+
+## 2. Usos não permitidos
+
+Sem autorização prévia e expressa por escrito do titular, não é permitido:
+
+- vender, licenciar, alugar ou monetizar o material, cópias ou trabalhos derivados;
+- incluí-lo em produto ou serviço comercial, ou utilizá-lo para obter vantagem comercial ou compensação financeira;
+- utilizá-lo em serviço hospedado, atividade operacional ou implantação de produção, mesmo que o acesso seja gratuito, quando não se tratar estritamente de estudo, pesquisa, ensino ou referência não comercial;
+- remover ou ocultar os avisos de autoria e desta licença, ou redistribuir o material sob termos que removam ou ampliem as permissões concedidas aqui.
+
+“Uso comercial” inclui, entre outros, uso associado à venda, publicidade monetizada, assinatura, prestação de serviço remunerada, produto pago ou benefício financeiro direto ou indireto.
+
+## 3. Direitos reservados e componentes de terceiros
+
+Todos os direitos não concedidos expressamente nesta licença ficam reservados ao titular. Esta licença não concede direitos sobre marcas, nomes, logotipos ou outros sinais distintivos.
+
+Código, bibliotecas, fontes, imagens, ícones e demais componentes de terceiros não são licenciados por este documento quando identificáveis como material de terceiros; aplicam-se a eles as respectivas licenças e avisos de seus titulares. Quem redistribuir o projeto deve respeitar esses termos separadamente.
+
+## 4. Isenção de garantia
+
+O material é fornecido “no estado em que se encontra”, sem garantias expressas ou implícitas, inclusive de funcionamento, adequação a uma finalidade ou ausência de violação de direitos de terceiros. Na extensão permitida pela lei aplicável, o titular não será responsável por danos decorrentes do uso ou da impossibilidade de uso do material.
+
+## 5. Outras permissões
+
+Qualquer uso não permitido por esta licença — inclusive uso comercial — exige autorização prévia e expressa por escrito do titular. Esta é uma licença personalizada, não uma licença MIT.
