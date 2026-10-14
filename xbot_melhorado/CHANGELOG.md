@@ -1,4 +1,41 @@
-# XBot v2.1 - Changelog das Melhorias
+# XBot — Changelog
+
+## 🔒 Versão 0.3.0 Beta — Revisão de autenticação e limite de uso
+
+### Corrigido (segurança)
+- **Entrypoint único**: `app_improved.py` não tinha `/sessao`, `/login` e `/registrar`. Agora existe um só
+  app (`app.py`) com todas as rotas; `python app.py` e `python app_improved.py` iniciam a mesma versão,
+  compatível com a interface. Quiz, exercícios e estatísticas do antigo `app_improved.py` foram incorporados.
+- **Chave secreta**: removida a chave padrão do Flask. `XBOT_SECRET_KEY` é obrigatória em produção (o padrão);
+  sem ela o início falha com mensagem clara. Em `development` usa-se uma chave temporária.
+- **Debug e rede**: debug só em `XBOT_ENV=development` e só em `127.0.0.1`; em produção o servidor embutido só
+  escuta em `127.0.0.1` (para rede/Internet: `wsgi.py` com waitress/gunicorn). Novo `wsgi.py`.
+- **Históricos**: leitura e exclusão exigem login e pertencem ao dono da sessão; o nome na URL não dá acesso.
+  Antes, qualquer pessoa lia ou apagava o histórico de qualquer nome.
+- **Limite do visitante**: os 10 minutos são controlados no servidor (tabela `visitantes`, preso a IP + navegador).
+  Apagar o cookie não zera mais o relógio. A regra de 10 minutos foi mantida.
+- **Login**: bloqueio temporário após tentativas repetidas (por e-mail e por IP, `429` + `Retry-After`) e limite de
+  cadastros por IP. Senha nova: 10 a 128 caracteres, sem senhas comuns, sequências ou dados pessoais.
+  Contas existentes continuam entrando.
+- **CSRF e CORS**: `POST`/`DELETE` exigem `X-CSRF-Token` + `Origin`/`Referer` do próprio site; CORS só para as
+  origens de `XBOT_ALLOWED_ORIGINS` (nunca `*`). Cookies `HttpOnly`, `SameSite=Lax`, `Secure` automático em HTTPS.
+- **Entradas**: corpo JSON malformado, com tipos errados, caractere nulo ou texto que não é UTF-8 válido
+  (por exemplo `"\ud800"` solto) devolve `400` controlado (antes: exceção `500`).
+- **Inicialização**: tabelas e seeds rodam uma vez (o recarregador do debug rodava tudo duas vezes) e **só em banco
+  vazio**. Antes, `run_apostilas_seed()` a cada início reescrevia palavras-chave refinadas (`html`, `python basico`,
+  `design digital`) e ressuscitava `protocolos e topologias de rede`. Reparo opcional:
+  `python database/reparar_refinamento.py`.
+- Rotas de diagnóstico (`/estatisticas`, `/db_status`, `/raciocinio_debug`) exigem login fora de `development`.
+
+### Alterado
+- A interface (`static/script.js`) envia o token CSRF e trata `429`/`403`; o cadastro pede senha de 10+ caracteres.
+- Em `/responder`, as palavras "pergunta" e "questão" deixaram de disparar o quiz (comuns demais).
+- Quiz e exercícios não são truncados para visitantes (são interativos).
+
+### Adicionado
+- Configuração por variáveis `XBOT_*` (e `.env`), `.env.example`, `.gitignore`.
+- Suíte de testes (`python -m unittest discover -v`) com bancos temporários — nunca toca no `xbot.db` real.
+- Scripts `seed.py` / `apostilas_seed.py` protegidos (`--forcar` + backup) e `reparar_refinamento.py`.
 
 ## 🚀 Versão 2.1 - Expansão Completa
 

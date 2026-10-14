@@ -1,10 +1,15 @@
-// XBot - Script JavaScript Melhorado v2.1
+// XBot - Script JavaScript v0.3.0 Beta
 // Desenvolvido por XByte Games Studios
 
 // Configurações e constantes
 const CONFIG = {
     API_ENDPOINT: '/responder',
     STATUS_ENDPOINT: '/status',
+    SESSAO_ENDPOINT: '/sessao',
+    LOGIN_ENDPOINT: '/login',
+    REGISTRAR_ENDPOINT: '/registrar',
+    LOGOUT_ENDPOINT: '/logout',
+    CSRF_HEADER: 'X-CSRF-Token',
     STORAGE_KEYS: {
         THEME: 'xbot_tema',
         USERNAME: 'xbot_nomeUsuario'
@@ -21,7 +26,9 @@ const AppState = {
     nomeUsuario: '',
     conversaAtiva: false,
     isTyping: false,
-    messageCount: 0
+    messageCount: 0,
+    csrfToken: null,   // token anti-CSRF entregue pelo servidor (/sessao, /login, /registrar, /logout)
+    sessao: { autenticado: false, usuario: null, tempoRestante: null, bloqueado: false }
 };
 
 // Utilitários
@@ -56,6 +63,77 @@ const Utils = {
             };
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
+        };
+    }
+};
+
+// Camada HTTP (v0.3.0 Beta): todo POST/DELETE leva o token CSRF do servidor no cabeçalho
+// X-CSRF-Token. O servidor também confere a origem da requisição.
+const Http = {
+    _sessaoEmAndamento: null,
+
+    // Consulta /sessao. Chamadas simultâneas compartilham a mesma requisição.
+    buscarSessao: () => {
+        if (!Http._sessaoEmAndamento) {
+            Http._sessaoEmAndamento = fetch(CONFIG.SESSAO_ENDPOINT, { credentials: 'same-origin' })
+                .then((response) => response.json())
+                .then((data) => {
+                    Http.atualizarToken(data);
+                    return data;
+                })
+                .finally(() => {
+                    Http._sessaoEmAndamento = null;
+                });
+        }
+        return Http._sessaoEmAndamento;
+    },
+
+    // Guarda o token que vier em qualquer resposta (o servidor troca o token no login/logout).
+    atualizarToken: (data) => {
+        if (data && typeof data.csrf_token === 'string' && data.csrf_token) {
+            AppState.csrfToken = data.csrf_token;
+        }
+    },
+
+    garantirToken: async () => {
+        if (!AppState.csrfToken) {
+            await Http.buscarSessao();
+        }
+        return AppState.csrfToken;
+    },
+
+    // Requisição que altera estado (POST/DELETE). Devolve { ok, status, data, retryAfter } também
+    // nos erros 4xx/5xx, porque o servidor responde erros em JSON. Se o token tiver expirado
+    // (403 'csrf'), busca um novo e repete UMA vez.
+    requisitar: async (url, { method = 'POST', corpo, repetir = true } = {}) => {
+        const headers = { [CONFIG.CSRF_HEADER]: await Http.garantirToken() };
+        if (corpo !== undefined) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const response = await fetch(url, {
+            method,
+            headers,
+            credentials: 'same-origin',
+            body: corpo === undefined ? undefined : JSON.stringify(corpo)
+        });
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (e) {
+            data = null;   // corpo vazio ou que não é JSON (ex.: erro de um proxy)
+        }
+        Http.atualizarToken(data);
+
+        if (response.status === 403 && data && data.codigo === 'csrf' && repetir) {
+            AppState.csrfToken = null;
+            return Http.requisitar(url, { method, corpo, repetir: false });
+        }
+        return {
+            ok: response.ok,
+            status: response.status,
+            data: data || {},
+            retryAfter: response.headers.get('Retry-After')
         };
     }
 };
@@ -155,6 +233,198 @@ const TypingIndicator = {
     }
 };
 
+// Gerenciamento de autenticação (v0.3.0 Beta)
+const AuthManager = {
+    init: () => {
+        AuthManager.verificarSessao();
+        AuthManager.iniciarContagem();
+
+        document.getElementById('btn-auth').addEventListener('click', () => {
+            if (AppState.sessao.autenticado) {
+                AuthManager.fazerLogout();
+            } else {
+                AuthManager.abrirModal('login');
+            }
+        });
+
+        document.getElementById('auth-modal-fechar').addEventListener('click', AuthManager.fecharModal);
+        document.getElementById('auth-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'auth-modal') AuthManager.fecharModal();
+        });
+
+        document.getElementById('auth-tab-login').addEventListener('click', () => AuthManager.trocarTab('login'));
+        document.getElementById('auth-tab-registrar').addEventListener('click', () => AuthManager.trocarTab('registrar'));
+
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await AuthManager.fazerLogin(
+                document.getElementById('login-email').value,
+                document.getElementById('login-senha').value
+            );
+        });
+
+        document.getElementById('form-registrar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await AuthManager.fazerCadastro(
+                document.getElementById('registrar-nome').value,
+                document.getElementById('registrar-email').value,
+                document.getElementById('registrar-senha').value
+            );
+        });
+    },
+
+    abrirModal: (aba = 'login') => {
+        document.getElementById('auth-modal').hidden = false;
+        AuthManager.trocarTab(aba);
+    },
+
+    fecharModal: () => {
+        document.getElementById('auth-modal').hidden = true;
+        ['login-erro', 'registrar-erro'].forEach(id => {
+            const el = document.getElementById(id);
+            el.hidden = true;
+            el.textContent = '';
+        });
+    },
+
+    trocarTab: (aba) => {
+        const ehLogin = aba === 'login';
+        document.getElementById('auth-tab-login').classList.toggle('active', ehLogin);
+        document.getElementById('auth-tab-registrar').classList.toggle('active', !ehLogin);
+        document.getElementById('form-login').hidden = !ehLogin;
+        document.getElementById('form-registrar').hidden = ehLogin;
+    },
+
+    // Converte o JSON do servidor (tempo_restante) para o formato usado na tela (tempoRestante).
+    aplicarSessao: (data) => {
+        AppState.sessao = {
+            autenticado: Boolean(data.autenticado),
+            usuario: data.usuario || null,
+            tempoRestante: typeof data.tempo_restante === 'number' ? data.tempo_restante : null,
+            bloqueado: Boolean(data.bloqueado)
+        };
+    },
+
+    verificarSessao: async () => {
+        try {
+            const data = await Http.buscarSessao();
+            AuthManager.aplicarSessao(data);
+            AuthManager.atualizarUI();
+        } catch (error) {
+            console.warn('Não foi possível verificar a sessão:', error);
+        }
+    },
+
+    // Mensagem para o usuário a partir da resposta de erro do servidor (que já vem em português).
+    mensagemDeErro: (resposta, padrao) => {
+        const { status, data, retryAfter } = resposta;
+        if (data.erro) {
+            return data.erro;
+        }
+        if (status === 429) {
+            const segundos = parseInt(retryAfter, 10);
+            const espera = Number.isFinite(segundos) && segundos > 0
+                ? ` Tente novamente em ${Math.ceil(segundos / 60)} min.`
+                : ' Aguarde alguns minutos.';
+            return `Muitas tentativas.${espera}`;
+        }
+        return padrao;
+    },
+
+    fazerLogin: async (email, senha) => {
+        const erroEl = document.getElementById('login-erro');
+        erroEl.hidden = true;
+        try {
+            const resposta = await Http.requisitar(CONFIG.LOGIN_ENDPOINT, { corpo: { email, senha } });
+            const data = resposta.data;
+
+            if (data.sucesso) {
+                AppState.sessao = { autenticado: true, usuario: data.usuario, tempoRestante: null, bloqueado: false };
+                AuthManager.atualizarUI();
+                AuthManager.fecharModal();
+                MessageManager.add(`Bem-vindo de volta, ${data.usuario.nome}! Agora você tem acesso completo, sem limites. 🎉`, 'bot');
+            } else {
+                erroEl.textContent = AuthManager.mensagemDeErro(resposta, 'Não foi possível entrar.');
+                erroEl.hidden = false;
+            }
+        } catch (error) {
+            erroEl.textContent = 'Erro de conexão. Tente novamente.';
+            erroEl.hidden = false;
+        }
+    },
+
+    fazerCadastro: async (nome, email, senha) => {
+        const erroEl = document.getElementById('registrar-erro');
+        erroEl.hidden = true;
+        try {
+            const resposta = await Http.requisitar(CONFIG.REGISTRAR_ENDPOINT, { corpo: { nome, email, senha } });
+            const data = resposta.data;
+
+            if (data.sucesso) {
+                AppState.sessao = { autenticado: true, usuario: data.usuario, tempoRestante: null, bloqueado: false };
+                AuthManager.atualizarUI();
+                AuthManager.fecharModal();
+                MessageManager.add(`Cadastro concluído, ${data.usuario.nome}! Você agora tem acesso completo ao XBot, sem limites. 🎉`, 'bot');
+            } else {
+                erroEl.textContent = AuthManager.mensagemDeErro(resposta, 'Não foi possível cadastrar.');
+                erroEl.hidden = false;
+            }
+        } catch (error) {
+            erroEl.textContent = 'Erro de conexão. Tente novamente.';
+            erroEl.hidden = false;
+        }
+    },
+
+    fazerLogout: async () => {
+        try {
+            await Http.requisitar(CONFIG.LOGOUT_ENDPOINT);
+        } catch (error) {
+            console.warn('Falha ao encerrar a sessão:', error);
+        } finally {
+            await AuthManager.verificarSessao();
+            MessageManager.add('Você saiu da sua conta. Continuando como visitante.', 'bot');
+        }
+    },
+
+    // Relógio da tela: só desconta os segundos entre uma resposta do servidor e a próxima.
+    // Quem decide se o visitante está bloqueado é SEMPRE o servidor (cada resposta reajusta o valor).
+    iniciarContagem: () => {
+        setInterval(() => {
+            const sessao = AppState.sessao;
+            if (sessao.autenticado || sessao.bloqueado || typeof sessao.tempoRestante !== 'number') {
+                return;
+            }
+            sessao.tempoRestante = Math.max(0, sessao.tempoRestante - 1);
+            sessao.bloqueado = sessao.tempoRestante === 0;
+            AuthManager.atualizarUI();
+        }, 1000);
+    },
+
+    atualizarUI: () => {
+        const btnAuth = document.getElementById('btn-auth');
+        const badge = document.getElementById('sessao-badge');
+        const { autenticado, usuario, tempoRestante, bloqueado } = AppState.sessao;
+
+        if (autenticado) {
+            btnAuth.textContent = `🚪 Sair (${usuario.nome})`;
+            badge.hidden = true;
+        } else {
+            btnAuth.textContent = '👤 Entrar';
+            if (typeof tempoRestante === 'number') {
+                const min = Math.floor(tempoRestante / 60);
+                const seg = tempoRestante % 60;
+                badge.textContent = bloqueado
+                    ? '⏰ Tempo esgotado'
+                    : `⏱️ ${min}:${seg.toString().padStart(2, '0')} restantes`;
+                badge.classList.toggle('tempo-baixo', tempoRestante <= 120);
+                badge.hidden = false;
+            } else {
+                badge.hidden = true;
+            }
+        }
+    }
+};
+
 // Gerenciamento de usuário
 const UserManager = {
     init: () => {
@@ -193,22 +463,23 @@ const UserManager = {
 const APIManager = {
     sendMessage: async (mensagem) => {
         try {
-            const response = await fetch(CONFIG.API_ENDPOINT, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    mensagem: mensagem,
-                    nome_usuario: AppState.nomeUsuario
-                })
+            const { ok, status, data } = await Http.requisitar(CONFIG.API_ENDPOINT, {
+                corpo: { mensagem: mensagem, nome_usuario: AppState.nomeUsuario }
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // 403 com bloqueado=true: o servidor encerrou o teste gratuito do visitante.
+            // O corpo traz o aviso e é tratado em ChatBot.sendMessage (abre o cadastro).
+            if (data.bloqueado) {
+                return data;
             }
 
-            const data = await response.json();
+            if (!ok) {
+                const erro = new Error(`HTTP error! status: ${status}`);
+                // Erros 4xx trazem uma explicação útil ("mensagem deve ser um texto"...); 5xx ficam genéricos.
+                erro.mensagemServidor = status < 500 ? data.erro : null;
+                throw erro;
+            }
+
             return data;
         } catch (error) {
             console.error('Erro na API:', error);
@@ -260,7 +531,25 @@ const ChatBot = {
         
         try {
             const data = await APIManager.sendMessage(mensagem);
-            
+
+            // v0.3.0 Beta: visitante com tempo esgotado — bloquear e abrir modal
+            if (data.bloqueado) {
+                TypingIndicator.hide();
+                MessageManager.add(data.resposta, 'bot');
+                inputMensagem.disabled = false;
+                btnEnviar.disabled = false;
+                AppState.sessao.bloqueado = true;
+                AppState.sessao.tempoRestante = 0;
+                AuthManager.atualizarUI();
+                AuthManager.abrirModal('registrar');
+                return;
+            }
+
+            // Atualizar status de sessão (tempo restante do visitante, se aplicável)
+            AppState.sessao.autenticado = data.autenticado;
+            AppState.sessao.tempoRestante = data.tempo_restante;
+            AuthManager.atualizarUI();
+
             // Simular delay de digitação
             setTimeout(() => {
                 TypingIndicator.hide();
@@ -274,7 +563,7 @@ const ChatBot = {
             
         } catch (error) {
             TypingIndicator.hide();
-            MessageManager.add('Desculpe, ocorreu um erro. Tente novamente.', 'bot');
+            MessageManager.add(error.mensagemServidor || 'Desculpe, ocorreu um erro. Tente novamente.', 'bot');
             console.error('Erro:', error);
             
             // Reabilitar input
@@ -411,6 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar componentes
     ThemeManager.init();
     UserManager.init();
+    AuthManager.init();
     EventManager.init();
     
     // Mensagem de boas-vindas

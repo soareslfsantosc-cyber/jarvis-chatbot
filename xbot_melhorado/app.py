@@ -1,19 +1,51 @@
-from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
-import random
-import datetime
-import re
-import logging
-from typing import Dict, List, Optional, Any
+"""
+app.py — XBot v0.3.0 Beta (aplicação ÚNICA)
 
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
+Desde a revisão de segurança existe um só ponto de entrada. O que vivia no antigo
+app_improved.py (quiz, exercícios, estatísticas de quiz) foi incorporado aqui, junto com
+SQLite, motor de raciocínio, login/sessão e as proteções (CSRF, CORS restrito, limite de
+visitante validado no servidor, bloqueio de tentativas de login).
+
+    python app.py            # lê XBOT_* do ambiente / arquivo .env  (veja README e .env.example)
+    python app_improved.py   # continua funcionando: apenas delega para este arquivo
+    wsgi.py                  # entrada para waitress/gunicorn
+"""
+
+import datetime
+import logging
+import os
+import random
+import re
+import sys
+import threading
+from collections import OrderedDict
+from typing import Any, Dict, List, Optional
+
+from flask import Flask, g, jsonify, render_template, request, session
+from flask.sessions import SecureCookieSessionInterface
+from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+import relogio
+from config import Config, ConfigError
+from historico import HistoricoConversas
+from seguranca import (
+    ErroRequisicao, campo_texto, impressao_do_cliente, ip_do_cliente,
+    limpar_nome_exibicao, obter_json_objeto, registrar_seguranca,
+    renovar_token_csrf, token_csrf,
+)
+from database import db as banco
+from database import visitantes
+from database.auth import autenticar, buscar_usuario_por_id, cadastrar
+from database.bootstrap import inicializar_banco
+from database.db import contar_registros, listar_tabelas
+from database.reasoning import RaciocinioCognitivo
+
+# O logging é configurado em main() (ou pelo servidor WSGI); aqui só pegamos o logger do módulo.
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)  # Permitir CORS para todas as rotas
-
-# Importar base de conhecimento
+# Importar base de conhecimento (mantida como fallback)
 try:
     from knowledge_base import KNOWLEDGE_BASE
     logger.info("Base de conhecimento carregada com sucesso")
@@ -21,10 +53,20 @@ except ImportError:
     logger.warning("Arquivo knowledge_base.py não encontrado, usando base de conhecimento integrada")
     KNOWLEDGE_BASE = {}
 
+# Quiz e exercícios (vinham do antigo app_improved.py)
+try:
+    from knowledge_base_extended import QUIZ_QUESTIONS, EXERCICIOS_PRATICOS
+except ImportError:
+    logger.warning("knowledge_base_extended.py não encontrado: quiz e exercícios indisponíveis")
+    QUIZ_QUESTIONS = {}
+    EXERCICIOS_PRATICOS = {}
+
 class XBotIA:
     """Classe principal do chatbot XBot com IA conversacional melhorada"""
     
-    def __init__(self):
+    def __init__(self, raciocinio: Optional[RaciocinioCognitivo] = None):
+        # Motor de raciocínio injetado pelo app (um por aplicação, cada um com seu cache do SQLite)
+        self.raciocinio = raciocinio
         self.respostas = {
             'saudacoes': [
                 "Olá, {nome}! É um prazer falar com você! Em que posso ajudar?",
@@ -88,6 +130,18 @@ class XBotIA:
                 "Obrigado, {nome}! Estou sempre me esforçando para melhorar!",
                 "Suas palavras são muito importantes para mim, {nome}!"
             ],
+            'quiz': [
+                "Que tal testarmos seus conhecimentos, {nome}? Posso criar um quiz sobre arquitetura de computadores, Python ou desenvolvimento web!",
+                "Adoro desafios! Quer fazer um quiz comigo, {nome}? Tenho perguntas sobre vários temas!",
+                "Vamos testar o que você aprendeu, {nome}? Posso fazer perguntas sobre tecnologia!",
+                "Quiz time, {nome}! Escolha um tema: arquitetura, programação ou web design!"
+            ],
+            'exercicios': [
+                "Quer praticar programação, {nome}? Tenho vários exercícios de Python!",
+                "Prática leva à perfeição! Posso sugerir exercícios de programação, {nome}!",
+                "Que tal alguns exercícios práticos, {nome}? Tenho desafios de diferentes níveis!",
+                "Vamos colocar a mão na massa, {nome}! Posso propor exercícios interessantes!"
+            ],
             'default': [
                 "Interessante, {nome}! Pode me contar mais sobre isso?",
                 "Hmm, não tenho certeza sobre isso, {nome}. Pode reformular?",
@@ -107,7 +161,12 @@ class XBotIA:
             'problemas': r'\b(problema|erro|bug|não funciona|ajuda|socorro|dificuldade)\b',
             'humor': r'\b(haha|kkkk|rsrs|lol|engraçado|piada|risos)\b',
             'elogios': r'\b(legal|bacana|incrível|ótimo|excelente|perfeito|maravilhoso|fantástico)\b',
-            'arquitetura_computadores': r'\b(arquitetura|computador|hardware|software|cpu|processador|memória|sistema computacional|von neumann|transistor|válvula|circuito integrado|microprocessador|geração|história|evolução|dispositivos|entrada|saída|licença|programa|linguagem|máquina|eniac|intel|pentium|nanotecnologia)\b'
+            'arquitetura_computadores': r'\b(arquitetura|computador|hardware|software|cpu|processador|memória|sistema computacional|von neumann|transistor|válvula|circuito integrado|microprocessador|geração|história|evolução|dispositivos|entrada|saída|licença|programa|linguagem|máquina|eniac|intel|pentium|nanotecnologia)\b',
+            # Categorias do antigo app_improved.py. Ficam DEPOIS das demais para não mudar a
+            # categoria de nenhuma mensagem que já era reconhecida ('pergunta' e 'questão'
+            # ficaram de fora: são comuns demais para sugerir um quiz).
+            'quiz': r'\b(quiz|teste|desafio|avaliar|testar)\b',
+            'exercicios': r'\b(exercício|exercicio|prática|pratica|exemplo|código|programar)\b'
         }
         
         # Base de conhecimento sobre Arquitetura de Computadores (integrada + externa)
@@ -159,6 +218,19 @@ class XBotIA:
             'computacao quantica': "Paradigma de computação que utiliza fenômenos quânticos como superposição e emaranhamento para processar informações. Qubits podem existir em múltiplos estados simultaneamente, oferecendo potencial para resolver problemas complexos exponencialmente mais rápido."
         }
         
+        # v0.3.0 Beta: rastrear origem da última resposta (sqlite ou fallback_python)
+        self.ultima_fonte      = "indefinido"
+        self.ultima_confianca  = "indefinido"   # alta/media/baixa/nenhuma
+        self.ultimos_relacionados = []           # tópicos correlacionados
+        self.ultimas_sugestoes    = []           # próximas perguntas sugeridas
+        self.ultimo_titulo_kb     = None         # título do último conhecimento usado
+
+        # v0.3.0 (unificação com o antigo app_improved.py): quiz e exercícios
+        self.quiz_questions = QUIZ_QUESTIONS
+        self.exercicios = EXERCICIOS_PRATICOS
+        self.user_quiz_state: "OrderedDict[str, Dict]" = OrderedDict()   # chave = dono da sessão
+        self._max_quizzes_ativos = 1000                                   # teto de memória
+
         # Integrar conhecimento externo se disponível
         if KNOWLEDGE_BASE:
             self._integrate_external_knowledge()
@@ -240,30 +312,264 @@ class XBotIA:
         
         return None
     
-    def gerar_resposta(self, mensagem: str, nome_usuario: str = "usuário") -> str:
-        """Gera resposta baseada na mensagem e contexto"""
+    # ------------------------------------------------------------------
+    # Quiz e exercícios (portados do antigo app_improved.py).
+    # O estado do quiz é do DONO da sessão (u:<id> / g:<visitante>), não do nome digitado:
+    # duas pessoas com o mesmo nome não misturam quizzes nem leem o andamento uma da outra.
+    # ------------------------------------------------------------------
+
+    def _quiz_ativo(self, dono: str) -> bool:
+        estado = self.user_quiz_state.get(dono)
+        return bool(estado and estado['ativo'])
+
+    def iniciar_quiz(self, categoria: str, dono: str, nome_usuario: str) -> str:
+        """Inicia um quiz para o dono da sessão"""
+        if categoria not in self.quiz_questions:
+            return f"Desculpe {nome_usuario}, não tenho quiz sobre {categoria[:40]}. Categorias disponíveis: {', '.join(self.quiz_questions.keys())}"
+
+        questions = self.quiz_questions[categoria]
+        if not questions:
+            return f"Não há perguntas disponíveis para {categoria}, {nome_usuario}."
+
+        # Inicializar estado do quiz
+        self.user_quiz_state[dono] = {
+            'categoria': categoria,
+            'questoes': questions.copy(),
+            'questao_atual': 0,
+            'pontuacao': 0,
+            'ativo': True
+        }
+        self.user_quiz_state.move_to_end(dono)
+        while len(self.user_quiz_state) > self._max_quizzes_ativos:
+            self.user_quiz_state.popitem(last=False)
+
+        primeira_questao = questions[0]
+        opcoes_texto = "\n".join([f"{i+1}. {opcao}" for i, opcao in enumerate(primeira_questao['opcoes'])])
+
+        return f"""🎯 Quiz de {categoria.title()} iniciado, {nome_usuario}!
+
+Questão 1/{len(questions)}:
+{primeira_questao['pergunta']}
+
+{opcoes_texto}
+
+Digite o número da sua resposta (1-{len(primeira_questao['opcoes'])})"""
+
+    def processar_resposta_quiz(self, resposta: str, dono: str, nome_usuario: str) -> str:
+        """Processa resposta do quiz"""
+        if not self._quiz_ativo(dono):
+            return f"Você não está em um quiz ativo, {nome_usuario}. Digite 'quiz' para começar!"
+
+        estado = self.user_quiz_state[dono]
+        questao_atual = estado['questoes'][estado['questao_atual']]
+
+        try:
+            resposta_num = int(resposta) - 1
+            if resposta_num < 0 or resposta_num >= len(questao_atual['opcoes']):
+                return f"Resposta inválida, {nome_usuario}. Digite um número entre 1 e {len(questao_atual['opcoes'])}."
+        except ValueError:
+            return f"Por favor digite apenas o número da resposta, {nome_usuario}."
+
+        # Verificar resposta
+        resultado = ""
+        if resposta_num == questao_atual['resposta_correta']:
+            estado['pontuacao'] += 1
+            resultado = f"✅ Correto, {nome_usuario}!\n{questao_atual['explicacao']}\n\n"
+        else:
+            resposta_correta = questao_atual['opcoes'][questao_atual['resposta_correta']]
+            resultado = f"❌ Incorreto, {nome_usuario}. A resposta correta é: {resposta_correta}\n{questao_atual['explicacao']}\n\n"
+
+        # Próxima questão ou fim do quiz
+        estado['questao_atual'] += 1
+
+        if estado['questao_atual'] >= len(estado['questoes']):
+            # Fim do quiz
+            pontuacao_final = estado['pontuacao']
+            total_questoes = len(estado['questoes'])
+            percentual = (pontuacao_final / total_questoes) * 100
+
+            estado['ativo'] = False
+
+            if percentual >= 80:
+                emoji = "🏆"
+                comentario = "Excelente!"
+            elif percentual >= 60:
+                emoji = "👏"
+                comentario = "Muito bem!"
+            else:
+                emoji = "📚"
+                comentario = "Continue estudando!"
+
+            return f"""{resultado}{emoji} Quiz finalizado, {nome_usuario}!
+Pontuação: {pontuacao_final}/{total_questoes} ({percentual:.1f}%)
+{comentario}
+
+Digite 'quiz' para fazer outro quiz!"""
+
+        else:
+            # Próxima questão
+            proxima_questao = estado['questoes'][estado['questao_atual']]
+            opcoes_texto = "\n".join([f"{i+1}. {opcao}" for i, opcao in enumerate(proxima_questao['opcoes'])])
+
+            return f"""{resultado}Questão {estado['questao_atual'] + 1}/{len(estado['questoes'])}:
+{proxima_questao['pergunta']}
+
+{opcoes_texto}
+
+Digite o número da sua resposta (1-{len(proxima_questao['opcoes'])})"""
+
+    def obter_exercicio(self, categoria: str, nome_usuario: str) -> str:
+        """Retorna um exercício prático"""
+        if categoria not in self.exercicios:
+            return f"Não tenho exercícios para {categoria[:40]}, {nome_usuario}. Categorias disponíveis: {', '.join(self.exercicios.keys())}"
+
+        exercicios_categoria = self.exercicios[categoria]
+        exercicio = random.choice(exercicios_categoria)
+
+        return f"""💻 Exercício: {exercicio['titulo']}
+
+📝 Descrição:
+{exercicio['descricao']}
+
+💡 Exemplo de código:
+```python{exercicio['codigo_exemplo']}```
+
+Tente implementar sua própria versão, {nome_usuario}!"""
+
+    def _comando_quiz(self, mensagem_lower: str, dono: str, nome_usuario: str) -> str:
+        """Mensagem que cita 'quiz': inicia o quiz do tema pedido ou lista os temas."""
+        if 'arquitetura' in mensagem_lower or 'hardware' in mensagem_lower:
+            return self.iniciar_quiz('arquitetura', dono, nome_usuario)
+        elif 'python' in mensagem_lower or 'programação' in mensagem_lower:
+            return self.iniciar_quiz('python', dono, nome_usuario)
+        elif 'web' in mensagem_lower or 'html' in mensagem_lower:
+            return self.iniciar_quiz('web', dono, nome_usuario)
+        return f"""🎯 Quizzes disponíveis, {nome_usuario}:
+
+1. **Arquitetura de Computadores** - Digite: "quiz arquitetura"
+2. **Python** - Digite: "quiz python"
+3. **Desenvolvimento Web** - Digite: "quiz web"
+
+Qual você gostaria de fazer?"""
+
+    def _comando_exercicio(self, mensagem_lower: str, nome_usuario: str) -> str:
+        """Mensagem que cita 'exercício': entrega um exercício de Python ou lista os temas."""
+        if 'python' in mensagem_lower:
+            return self.obter_exercicio('python_basico', nome_usuario)
+        return f"""💻 Exercícios disponíveis, {nome_usuario}:
+
+1. **Python Básico** - Digite: "exercício python"
+
+Qual você gostaria de praticar?"""
+
+    # ------------------------------------------------------------------
+    # Geração de resposta
+    # ------------------------------------------------------------------
+
+    def _zerar_metadados(self):
+        """
+        Zera os metadados da última resposta. Sem isso, um caminho que não define
+        confiança/relacionados (fallback, resposta padrão, quiz) herdava os valores da
+        resposta ANTERIOR — que podia ter sido de outro usuário.
+        """
+        self.ultima_fonte = "indefinido"
+        self.ultima_confianca = "indefinido"
+        self.ultimos_relacionados = []
+        self.ultimas_sugestoes = []
+        self.ultimo_titulo_kb = None
+
+    def gerar_resposta(self, mensagem: str, nome_usuario: str = "usuário",
+                       historico_sessao: Optional[List[Dict]] = None,
+                       dono: Optional[str] = None) -> str:
+        """
+        Gera resposta baseada na mensagem e contexto.
+
+        Fluxo v0.3.0 Beta:
+          0. Quiz/exercício (comandos explícitos, vindos do antigo app_improved.py)
+          1. Motor de raciocínio sobre o SQLite
+          2. Se não encontrou → fallback: lógica Python original
+          3. Sem nada → resposta padrão da categoria
+
+        `historico_sessao` e `dono` são definidos pelo SERVIDOR (sessão validada); o nome
+        digitado pelo usuário serve apenas para tratá-lo pelo nome.
+        """
+        self._zerar_metadados()
+        historico_sessao = historico_sessao or []
+        dono = dono or f"n:{nome_usuario}"
         categoria = self.detectar_categoria(mensagem)
-        
+        mensagem_lower = mensagem.lower()
+
+        # ================================================================
+        # Quiz e exercícios
+        # ================================================================
+        if self._quiz_ativo(dono) and mensagem.strip().isdigit():
+            self.ultima_fonte = "quiz"
+            return self.processar_resposta_quiz(mensagem.strip(), dono, nome_usuario)
+        if 'quiz' in mensagem_lower:
+            self.ultima_fonte = "quiz"
+            return self._comando_quiz(mensagem_lower, dono, nome_usuario)
+        if 'exercício' in mensagem_lower or 'exercicio' in mensagem_lower:
+            self.ultima_fonte = "exercicio"
+            return self._comando_exercicio(mensagem_lower, nome_usuario)
+
+        # ================================================================
+        # v0.3.0 Beta — MOTOR DE RACIOCÍNIO COGNITIVO (prioridade máxima)
+        # ================================================================
+        try:
+            resultado_r = (
+                self.raciocinio.analisar(mensagem, historico_sessao)
+                if self.raciocinio is not None else None
+            )
+
+            if resultado_r is not None and resultado_r.nivel_confianca in ('alta', 'media', 'baixa'):
+                self.ultima_fonte         = "reasoning"
+                self.ultima_confianca     = resultado_r.nivel_confianca
+                self.ultimos_relacionados = resultado_r.topicos_relacionados
+                self.ultimas_sugestoes    = resultado_r.sugestoes_proximas
+                self.ultimo_titulo_kb     = resultado_r.vencedor.titulo
+                logger.info(
+                    f"[Reasoning] '{resultado_r.vencedor.titulo}' | "
+                    f"conf={resultado_r.nivel_confianca} | "
+                    f"margem={resultado_r.margem_lideranca:.1f}"
+                )
+                resposta_final = resultado_r.resposta_construida
+                if resultado_r.nivel_confianca == 'baixa':
+                    resposta_final += f"\n\nSe quiser mais detalhes, {nome_usuario}, pode reformular a pergunta!"
+                else:
+                    resposta_final += f"\n\nPosso explicar mais alguma coisa, {nome_usuario}?"
+                return resposta_final
+
+        except Exception as e:
+            logger.warning(
+                f"[XBot] Falha no Reasoning Engine, usando fallback: {e}"
+            )
+        # ================================================================
+        # FALLBACK — base de conhecimento Python original
+        # ================================================================
+
         # Primeiro, verifica se é uma pergunta sobre arquitetura de computadores
         if categoria == 'arquitetura_computadores':
             conhecimento = self.buscar_conhecimento_arquitetura(mensagem)
             if conhecimento:
+                self.ultima_fonte = "fallback_python"
                 return f"{conhecimento}\n\nPosso explicar mais alguma coisa sobre arquitetura de computadores, {nome_usuario}?"
-        
+
         # Busca conhecimento mesmo se não foi categorizado como arquitetura
         conhecimento = self.buscar_conhecimento_arquitetura(mensagem)
         if conhecimento:
+            self.ultima_fonte = "fallback_python"
             return f"{conhecimento}\n\nEssa informação foi útil, {nome_usuario}? Posso esclarecer mais alguma dúvida?"
-        
+
         # Se não encontrou conhecimento específico, usa as respostas padrão
+        self.ultima_fonte = "resposta_padrao"
         respostas_categoria = self.respostas.get(categoria, self.respostas['default'])
         resposta = random.choice(respostas_categoria)
-        
+
         # Personalizar com o nome do usuário
         resposta = resposta.format(nome=nome_usuario)
-        
+
         return resposta
-    
+
     def get_available_topics(self) -> List[str]:
         """Retorna lista de tópicos disponíveis"""
         return list(self.conhecimento_arquitetura.keys())
@@ -274,197 +580,609 @@ class XBotIA:
             "total_respostas_padrao": sum(len(respostas) for respostas in self.respostas.values()),
             "total_padroes": len(self.padroes),
             "total_conhecimento": len(self.conhecimento_arquitetura),
-            "categorias": list(self.padroes.keys())
+            "categorias": list(self.padroes.keys()),
+            "quiz_categorias": list(self.quiz_questions.keys()),
+            "exercicio_categorias": list(self.exercicios.keys())
         }
 
-# Instância do bot
-xbot = XBotIA()
 
-# Histórico de conversas (em produção, usar banco de dados)
-historico_conversas: Dict[str, List[Dict]] = {}
-estatisticas_uso: Dict[str, Any] = {
-    "total_mensagens": 0,
-    "usuarios_unicos": set(),
-    "inicio_servico": datetime.datetime.now()
-}
+# ============================================================================
+# v0.3.0 Beta — PRÉVIA PARA VISITANTES
+# ============================================================================
 
-@app.route("/")
-def home():
-    """Página principal do chatbot"""
-    return render_template("index.html")
+def _truncar_para_guest(texto: str, limite: int = 220) -> str:
+    """
+    Trunca a resposta do XBot para visitantes não cadastrados, cortando em
+    fim de frase sempre que possível, e acrescenta uma chamada para cadastro.
+    Remove rodapés (relacionados/sugestões/pergunta de fechamento) do corpo
+    antes de truncar, para não cortar no meio deles.
+    """
+    corpo = texto
+    for marcador in ('\n\n📚', '\n\n💡', '\n\nPosso explicar', '\n\nSe quiser mais'):
+        corpo = corpo.split(marcador)[0]
 
-@app.route("/responder", methods=["POST"])
-def resposta():
-    """Endpoint principal para processar mensagens"""
-    try:
-        dados = request.get_json()
-        
-        if not dados:
-            return jsonify({"erro": "Dados JSON inválidos"}), 400
-        
-        mensagem = dados.get("mensagem", "").strip()
-        nome_usuario = dados.get("nome_usuario", "usuário").strip()
-        
-        if not mensagem:
-            return jsonify({"resposta": "Por favor, digite uma mensagem!"})
-        
-        if len(mensagem) > 500:
-            return jsonify({"resposta": "Mensagem muito longa! Máximo de 500 caracteres."})
-        
-        # Gerar resposta usando a IA do bot
-        resposta_bot = xbot.gerar_resposta(mensagem, nome_usuario)
-        
-        # Atualizar estatísticas
-        estatisticas_uso["total_mensagens"] += 1
-        estatisticas_uso["usuarios_unicos"].add(nome_usuario)
-        
-        # Salvar no histórico
-        timestamp = datetime.datetime.now().isoformat()
-        if nome_usuario not in historico_conversas:
-            historico_conversas[nome_usuario] = []
-        
-        historico_conversas[nome_usuario].append({
-            'timestamp': timestamp,
-            'usuario': mensagem,
-            'bot': resposta_bot,
-            'categoria': xbot.detectar_categoria(mensagem)
+    if len(corpo) <= limite:
+        trecho = corpo
+    else:
+        trecho = corpo[:limite]
+        ultimo_ponto = trecho.rfind('. ')
+        trecho = trecho[:ultimo_ponto + 1] if ultimo_ponto > 50 else trecho.rstrip() + '...'
+
+    return trecho + "\n\n🔒 Essa é só uma prévia. Cadastre-se gratuitamente para ver a explicação completa e sem limites!"
+
+
+# ============================================================================
+# Aplicação Flask (fábrica)
+# ============================================================================
+
+class _SessaoXBot(SecureCookieSessionInterface):
+    """Cookie de sessão com Secure automático: só marca Secure quando a requisição chegou por HTTPS."""
+
+    def get_cookie_secure(self, app):
+        configurado = app.config["XBOT"].cookie_secure
+        return request.is_secure if configurado is None else configurado
+
+
+class _Estado:
+    """Tudo que muda durante a execução, preso à instância do app (nada de globais soltas)."""
+
+    def __init__(self):
+        self.raciocinio = RaciocinioCognitivo()      # cache próprio dos registros do SQLite
+        self.bot = XBotIA(self.raciocinio)
+        self.historico = HistoricoConversas()
+        # O XBotIA guarda "última fonte/confiança/relacionados" em atributos da instância:
+        # gerar a resposta e ler esses atributos acontece sob esta trava, para duas requisições
+        # simultâneas não misturarem metadados.
+        self.trava = threading.RLock()
+        self.estatisticas: Dict[str, Any] = {
+            "total_mensagens": 0,
+            "usuarios_unicos": set(),
+            "quizzes_realizados": 0,
+            "exercicios_solicitados": 0,
+            "inicio_servico": datetime.datetime.now(),
+        }
+
+
+def create_app(config: Optional[Config] = None, *, inicializar: bool = True) -> Flask:
+    """
+    Cria a aplicação. Sem `config`, lê XBOT_* do ambiente/.env (e FALHA com mensagem clara
+    se faltar a chave secreta em produção). `inicializar=False` pula a criação das tabelas
+    e os seeds — usado pelo processo "pai" do recarregador do Flask, que só vigia arquivos.
+    """
+    cfg = config or Config.from_env()
+
+    app = Flask(__name__)
+    app.config.update(
+        SECRET_KEY=cfg.secret_key,
+        DEBUG=cfg.debug,                        # só a configuração do XBot decide; FLASK_DEBUG do ambiente não liga o debug
+        MAX_CONTENT_LENGTH=cfg.max_body_bytes,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE=cfg.cookie_samesite,
+        XBOT=cfg,
+    )
+    app.session_interface = _SessaoXBot()
+    if cfg.trusted_proxies:
+        n = cfg.trusted_proxies
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=n, x_proto=n, x_host=n)
+
+    banco.configurar_caminho(cfg.db_path)
+    if inicializar:
+        inicializar_banco()
+
+    estado = _Estado()
+    estado.raciocinio.invalidar_cache()   # garantir que o Reasoning Engine use dados frescos
+    app.extensions["xbot"] = estado
+
+    if cfg.allowed_origins:
+        CORS(
+            app,
+            origins=list(cfg.allowed_origins),       # lista exata — nunca "*" com cookies
+            supports_credentials=True,
+            allow_headers=["Content-Type", "X-CSRF-Token"],
+            methods=["GET", "POST", "DELETE", "OPTIONS"],
+            max_age=600,
+        )
+    registrar_seguranca(app)
+    _registrar_rotas(app, estado)
+    return app
+
+
+def _registrar_rotas(app: Flask, estado: _Estado) -> None:
+    cfg: Config = app.config["XBOT"]
+    bot = estado.bot
+
+    # ------------------------------------------------------------------
+    # Sessão: quem é "dono" desta requisição?
+    # ------------------------------------------------------------------
+
+    def usuario_logado() -> Optional[dict]:
+        """Usuário da sessão (conferido no banco). Cookie com id inexistente é descartado."""
+        if hasattr(g, "usuario_xbot"):
+            return g.usuario_xbot
+        usuario = buscar_usuario_por_id(session.get("user_id"))
+        if usuario is None and "user_id" in session:
+            session.pop("user_id", None)           # conta apagada ou cookie adulterado
+        g.usuario_xbot = usuario
+        return usuario
+
+    def status_sessao() -> dict:
+        """
+        Logado → ilimitado. Visitante → relógio de XBOT_GUEST_SECONDS (padrão 10 min) mantido
+        NO SERVIDOR, preso a IP + navegador (apagar o cookie não zera). `dono` identifica o
+        histórico/quiz desta pessoa e nunca sai do servidor.
+        """
+        if hasattr(g, "status_xbot"):
+            return g.status_xbot
+        usuario = usuario_logado()
+        if usuario:
+            status = {"autenticado": True, "usuario": usuario, "tempo_restante": None,
+                      "bloqueado": False, "dono": f"u:{usuario['id']}"}
+        else:
+            visitante = visitantes.consultar(
+                session.get("visitor_id"), impressao_do_cliente(),
+                agora=relogio.agora(), limite=cfg.guest_seconds,
+                cooldown=cfg.guest_cooldown_seconds, max_sessoes=cfg.guest_max_sessions,
+            )
+            if session.get("visitor_id") != visitante.visitor_id:
+                session["visitor_id"] = visitante.visitor_id
+            status = {"autenticado": False, "usuario": None, "tempo_restante": visitante.restante,
+                      "bloqueado": visitante.bloqueado, "dono": f"g:{visitante.visitor_id}"}
+        g.status_xbot = status
+        return status
+
+    def trocar_sessao_para(usuario: dict) -> str:
+        """Login/cadastro: sessão nova (evita fixação) e novo token CSRF."""
+        session.clear()
+        session["user_id"] = usuario["id"]
+        token = renovar_token_csrf()
+        g.usuario_xbot = usuario
+        g.pop("status_xbot", None)
+        return token
+
+    def exigir_login() -> dict:
+        usuario = usuario_logado()
+        if not usuario:
+            raise ErroRequisicao("É preciso entrar na sua conta para acessar esta função.",
+                                 401, "nao_autenticado")
+        return usuario
+
+    def exigir_diagnostico() -> None:
+        """Rotas de diagnóstico: abertas só se XBOT_DIAGNOSTICS=1 (padrão: development)."""
+        if not cfg.diagnostics_open:
+            exigir_login()
+
+    def resposta_bloqueada():
+        resposta = jsonify({
+            "resposta": (
+                "⏰ Seu tempo de teste gratuito acabou! "
+                "Cadastre-se gratuitamente para continuar conversando com o XBot sem limites."
+            ),
+            "bloqueado": True,
+            "autenticado": False,
+            "tempo_restante": 0,
+            "codigo": "limite_visitante",
         })
-        
-        # Limitar histórico por usuário (últimas 100 mensagens)
-        if len(historico_conversas[nome_usuario]) > 100:
-            historico_conversas[nome_usuario] = historico_conversas[nome_usuario][-100:]
-        
-        logger.info(f"Mensagem processada para {nome_usuario}: {mensagem[:50]}...")
-        
-        return jsonify({
-            "resposta": resposta_bot,
-            "timestamp": timestamp,
-            "categoria": xbot.detectar_categoria(mensagem)
-        })
-        
-    except Exception as e:
-        logger.error(f"Erro ao processar mensagem: {e}")
-        return jsonify({
-            "resposta": "Desculpe, ocorreu um erro interno. Tente novamente.",
-            "erro": str(e)
-        }), 500
+        resposta.status_code = 403
+        return resposta
 
-@app.route("/historico/<nome_usuario>", methods=["GET"])
-def obter_historico(nome_usuario: str):
-    """Endpoint para obter histórico de conversas de um usuário"""
-    try:
-        historico = historico_conversas.get(nome_usuario, [])
+    def falha_de_autenticacao(resultado: dict, status_http: int):
+        if resultado.get("codigo") == "muitas_tentativas":
+            status_http = 429
+        resposta = jsonify(resultado)
+        resposta.status_code = status_http
+        if "retry_after" in resultado:
+            resposta.headers["Retry-After"] = str(resultado["retry_after"])
+        return resposta
+
+    # ------------------------------------------------------------------
+    # Autenticação
+    # ------------------------------------------------------------------
+
+    @app.route("/registrar", methods=["POST"])
+    def registrar():
+        """Cria uma nova conta e já autentica o usuário (login automático)."""
+        dados = obter_json_objeto()
+        nome = campo_texto(dados, "nome", obrigatorio=True, max_len=200)
+        email = campo_texto(dados, "email", obrigatorio=True, max_len=320)
+        senha = campo_texto(dados, "senha", obrigatorio=True, strip=False, max_len=256)
+        resultado = cadastrar(nome, email, senha, ip=ip_do_cliente(), cfg=cfg)
+        if resultado["sucesso"]:
+            token = trocar_sessao_para(resultado["usuario"])
+            return jsonify({**resultado, "csrf_token": token})
+        return falha_de_autenticacao(resultado, 400)
+
+    @app.route("/login", methods=["POST"])
+    def login():
+        """Autentica um usuário existente por e-mail e senha."""
+        dados = obter_json_objeto()
+        email = campo_texto(dados, "email", obrigatorio=True, max_len=320)
+        senha = campo_texto(dados, "senha", obrigatorio=True, strip=False, max_len=256)
+        resultado = autenticar(email, senha, ip=ip_do_cliente(), cfg=cfg)
+        if resultado["sucesso"]:
+            token = trocar_sessao_para(resultado["usuario"])
+            return jsonify({**resultado, "csrf_token": token})
+        return falha_de_autenticacao(resultado, 401)
+
+    @app.route("/logout", methods=["POST"])
+    def logout():
+        """Encerra a sessão atual (login ou contagem de visitante)."""
+        session.clear()
+        g.pop("usuario_xbot", None)
+        g.pop("status_xbot", None)
+        return jsonify({"sucesso": True, "csrf_token": renovar_token_csrf()})
+
+    @app.route("/sessao", methods=["GET"])
+    def sessao():
+        """Status da sessão para o frontend decidir a UI (+ token CSRF para as próximas requisições)."""
+        status = status_sessao()
+        corpo = {chave: status[chave] for chave in ("autenticado", "usuario", "tempo_restante", "bloqueado")}
+        corpo["csrf_token"] = token_csrf()
+        return jsonify(corpo)
+
+    # ------------------------------------------------------------------
+    # Chat
+    # ------------------------------------------------------------------
+
+    @app.route("/")
+    def home():
+        """Página principal do chatbot"""
+        return render_template("index.html")
+
+    @app.route("/responder", methods=["POST"])
+    def resposta():
+        """Endpoint principal para processar mensagens"""
+        try:
+            status = status_sessao()
+
+            if status["bloqueado"]:
+                return resposta_bloqueada()
+
+            dados = obter_json_objeto()
+            if not dados:
+                raise ErroRequisicao("Dados JSON inválidos", 400, "json_invalido")
+
+            mensagem = campo_texto(dados, "mensagem", padrao="")
+            nome_usuario = limpar_nome_exibicao(campo_texto(dados, "nome_usuario", padrao=""))
+
+            if not mensagem:
+                return jsonify({"resposta": "Por favor, digite uma mensagem!"})
+
+            if len(mensagem) > 500:
+                return jsonify({"resposta": "Mensagem muito longa! Máximo de 500 caracteres."})
+
+            dono = status["dono"]
+
+            # Gerar resposta usando a IA do bot (e ler os metadados dela) sob a trava
+            with estado.trava:
+                historico_sessao = estado.historico.obter(dono, nome_usuario)
+                resposta_bot = bot.gerar_resposta(
+                    mensagem, nome_usuario, historico_sessao=historico_sessao, dono=dono
+                )
+                fonte = bot.ultima_fonte
+                confianca = bot.ultima_confianca
+                relacionados = list(bot.ultimos_relacionados)
+                sugestoes = list(bot.ultimas_sugestoes)
+                titulo_kb = bot.ultimo_titulo_kb
+                categoria = bot.detectar_categoria(mensagem)
+
+            # v0.3.0 Beta: visitantes não cadastrados recebem prévia truncada
+            # (quiz e exercícios são interativos: truncar quebraria o fluxo, e já estão
+            # limitados pelos 10 minutos do visitante)
+            if not status["autenticado"] and fonte not in ("quiz", "exercicio"):
+                resposta_bot = _truncar_para_guest(resposta_bot)
+
+            # Atualizar estatísticas
+            minuscula = mensagem.lower()
+            with estado.trava:
+                estatisticas = estado.estatisticas
+                estatisticas["total_mensagens"] += 1
+                if len(estatisticas["usuarios_unicos"]) < 10000:      # teto de memória
+                    estatisticas["usuarios_unicos"].add(nome_usuario)
+                if 'quiz' in minuscula:
+                    estatisticas["quizzes_realizados"] += 1
+                if 'exercício' in minuscula or 'exercicio' in minuscula:
+                    estatisticas["exercicios_solicitados"] += 1
+
+            # Salvar no histórico (do DONO da sessão; o nome só escolhe a conversa)
+            timestamp = datetime.datetime.now().isoformat()
+            estado.historico.adicionar(dono, nome_usuario, {
+                'timestamp': timestamp,
+                'usuario': mensagem,
+                'bot': resposta_bot,
+                'categoria': categoria,
+                # Metadados de contexto para o Reasoning Engine
+                'titulo_conhecimento': titulo_kb,
+                'categoria_respondida': fonte if fonte == 'resposta_padrao' else categoria,
+            })
+
+            logger.info(
+                "Mensagem processada (%s, %d caracteres, fonte=%s)",
+                "usuário" if status["autenticado"] else "visitante", len(mensagem), fonte,
+            )
+
+            return jsonify({
+                "resposta": resposta_bot,
+                "timestamp": timestamp,
+                "categoria": categoria,
+                "fonte_resposta": fonte,
+                # ── Campos do Reasoning Engine (v0.3.0 Beta) ──
+                "nivel_confianca": confianca,
+                "topicos_relacionados": relacionados,
+                "sugestoes_proximas": sugestoes,
+                # ── Campos de sessão/autenticação (v0.3.0 Beta) ──
+                "autenticado": status['autenticado'],
+                "tempo_restante": status['tempo_restante'],
+                "bloqueado": False,
+            })
+
+        except (ErroRequisicao, HTTPException):
+            raise          # 400/413/415... já têm tratador próprio (JSON com o status certo)
+        except Exception:
+            logger.exception("Erro ao processar mensagem")
+            erro = jsonify({
+                "resposta": "Desculpe, ocorreu um erro interno. Tente novamente.",
+                "erro": "Erro interno do servidor",
+            })
+            erro.status_code = 500
+            return erro
+
+    @app.route("/quiz/<categoria>", methods=["POST"])
+    def iniciar_quiz_endpoint(categoria: str):
+        """Endpoint para iniciar quiz específico (vindo do antigo app_improved.py)"""
+        status = status_sessao()
+        if status["bloqueado"]:
+            return resposta_bloqueada()
+        dados = obter_json_objeto()
+        nome_usuario = limpar_nome_exibicao(campo_texto(dados, "nome_usuario", padrao=""))
+        with estado.trava:
+            texto = bot.iniciar_quiz(categoria, status["dono"], nome_usuario)
+            estado.estatisticas["quizzes_realizados"] += 1
+        return jsonify({"resposta": texto})
+
+    @app.route("/exercicio/<categoria>", methods=["GET"])
+    def obter_exercicio_endpoint(categoria: str):
+        """Endpoint para obter exercício (vindo do antigo app_improved.py)"""
+        status = status_sessao()
+        if status["bloqueado"]:
+            return resposta_bloqueada()
+        nome_usuario = limpar_nome_exibicao(request.args.get("usuario", ""))
+        with estado.trava:
+            texto = bot.obter_exercicio(categoria, nome_usuario)
+            estado.estatisticas["exercicios_solicitados"] += 1
+        return jsonify({"resposta": texto})
+
+    # ------------------------------------------------------------------
+    # Históricos — SÓ do próprio usuário autenticado
+    # ------------------------------------------------------------------
+
+    @app.route("/historico/<nome_usuario>", methods=["GET"])
+    def obter_historico(nome_usuario: str):
+        """
+        Histórico de uma conversa do PRÓPRIO usuário logado. O nome na URL apenas escolhe
+        qual das conversas dele; quem é o dono vem da sessão, nunca da URL.
+        """
+        usuario = exigir_login()
+        historico = estado.historico.obter(f"u:{usuario['id']}", limpar_nome_exibicao(nome_usuario))
         return jsonify({
             "historico": historico,
             "total_mensagens": len(historico)
         })
-    except Exception as e:
-        logger.error(f"Erro ao obter histórico: {e}")
-        return jsonify({"erro": "Erro ao obter histórico"}), 500
 
-@app.route("/status", methods=["GET"])
-def status():
-    """Endpoint para verificar status do bot"""
-    try:
-        uptime = datetime.datetime.now() - estatisticas_uso["inicio_servico"]
-        
+    @app.route("/limpar_historico/<nome_usuario>", methods=["DELETE"])
+    def limpar_historico_usuario(nome_usuario: str):
+        """Limpa uma conversa do PRÓPRIO usuário logado (nunca de outro)."""
+        usuario = exigir_login()
+        nome = limpar_nome_exibicao(nome_usuario)
+        if estado.historico.limpar(f"u:{usuario['id']}", nome):
+            return jsonify({"mensagem": f"Histórico de {nome} limpo com sucesso"})
+        return jsonify({"mensagem": "Usuário não encontrado"}), 404
+
+    # ------------------------------------------------------------------
+    # Informações gerais
+    # ------------------------------------------------------------------
+
+    @app.route("/status", methods=["GET"])
+    def status_bot():
+        """Endpoint para verificar status do bot"""
+        with estado.trava:
+            estatisticas = dict(estado.estatisticas)
+            unicos = len(estatisticas["usuarios_unicos"])
+        uptime = datetime.datetime.now() - estatisticas["inicio_servico"]
         return jsonify({
             "status": "online",
             "versao": "2.1",
             "desenvolvedor": "XByte Games Studios",
-            "usuarios_ativos": len(historico_conversas),
-            "usuarios_unicos": len(estatisticas_uso["usuarios_unicos"]),
-            "total_mensagens": estatisticas_uso["total_mensagens"],
+            "usuarios_ativos": estado.historico.total_conversas(),
+            "usuarios_unicos": unicos,
+            "total_mensagens": estatisticas["total_mensagens"],
+            "quizzes_realizados": estatisticas["quizzes_realizados"],
+            "exercicios_solicitados": estatisticas["exercicios_solicitados"],
             "conhecimento": "Arquitetura de Computadores integrada",
             "uptime_segundos": int(uptime.total_seconds()),
             "uptime_formatado": str(uptime).split('.')[0],
-            "estatisticas_bot": xbot.get_statistics()
+            "estatisticas_bot": bot.get_statistics()
         })
-    except Exception as e:
-        logger.error(f"Erro ao obter status: {e}")
-        return jsonify({"erro": "Erro ao obter status"}), 500
 
-@app.route("/conhecimento", methods=["GET"])
-def listar_conhecimento():
-    """Endpoint para listar tópicos de conhecimento disponíveis"""
-    try:
-        topicos = xbot.get_available_topics()
+    @app.route("/conhecimento", methods=["GET"])
+    def listar_conhecimento():
+        """Endpoint para listar tópicos de conhecimento disponíveis"""
+        topicos = bot.get_available_topics()
         return jsonify({
             "topicos_disponiveis": sorted(topicos),
             "total_topicos": len(topicos),
-            "categorias_resposta": list(xbot.padroes.keys())
+            "categorias_resposta": list(bot.padroes.keys()),
+            "quiz_categorias": list(bot.quiz_questions.keys()),
+            "exercicio_categorias": list(bot.exercicios.keys())
         })
-    except Exception as e:
-        logger.error(f"Erro ao listar conhecimento: {e}")
-        return jsonify({"erro": "Erro ao listar conhecimento"}), 500
 
-@app.route("/estatisticas", methods=["GET"])
-def obter_estatisticas():
-    """Endpoint para obter estatísticas detalhadas"""
-    try:
-        uptime = datetime.datetime.now() - estatisticas_uso["inicio_servico"]
-        
+    # ------------------------------------------------------------------
+    # Diagnóstico (abertos só em development; senão exigem login)
+    # ------------------------------------------------------------------
+
+    @app.route("/estatisticas", methods=["GET"])
+    def obter_estatisticas():
+        """Endpoint para obter estatísticas detalhadas"""
+        exigir_diagnostico()
+        with estado.trava:
+            estatisticas = dict(estado.estatisticas)
+            unicos = len(estatisticas["usuarios_unicos"])
+        uptime = datetime.datetime.now() - estatisticas["inicio_servico"]
+
         # Estatísticas por categoria
-        categorias_count = {}
-        for historico in historico_conversas.values():
-            for msg in historico:
-                categoria = msg.get('categoria', 'unknown')
-                categorias_count[categoria] = categorias_count.get(categoria, 0) + 1
-        
+        categorias_count: Dict[str, int] = {}
+        for msg in estado.historico.todas_as_entradas():
+            categoria = msg.get('categoria', 'unknown')
+            categorias_count[categoria] = categorias_count.get(categoria, 0) + 1
+
         return jsonify({
             "uptime": {
                 "segundos": int(uptime.total_seconds()),
                 "formatado": str(uptime).split('.')[0]
             },
             "usuarios": {
-                "total_unicos": len(estatisticas_uso["usuarios_unicos"]),
-                "com_historico": len(historico_conversas)
+                "total_unicos": unicos,
+                "com_historico": estado.historico.total_conversas()
             },
             "mensagens": {
-                "total": estatisticas_uso["total_mensagens"],
+                "total": estatisticas["total_mensagens"],
                 "por_categoria": categorias_count
             },
-            "bot": xbot.get_statistics(),
-            "inicio_servico": estatisticas_uso["inicio_servico"].isoformat()
+            "interacoes": {
+                "quizzes_realizados": estatisticas["quizzes_realizados"],
+                "exercicios_solicitados": estatisticas["exercicios_solicitados"]
+            },
+            "bot": bot.get_statistics(),
+            "inicio_servico": estatisticas["inicio_servico"].isoformat()
         })
-    except Exception as e:
-        logger.error(f"Erro ao obter estatísticas: {e}")
-        return jsonify({"erro": "Erro ao obter estatísticas"}), 500
 
-@app.route("/limpar_historico/<nome_usuario>", methods=["DELETE"])
-def limpar_historico_usuario(nome_usuario: str):
-    """Endpoint para limpar histórico de um usuário específico"""
+    @app.route("/raciocinio_debug", methods=["POST"])
+    def raciocinio_debug():
+        """Endpoint de debug do Reasoning Engine — mostra parâmetros e scores"""
+        exigir_diagnostico()
+        dados = obter_json_objeto()
+        mensagem = campo_texto(dados, "mensagem", padrao="", max_len=500)
+        if not mensagem:
+            raise ErroRequisicao('Campo mensagem obrigatório', 400, "campo_obrigatorio")
+        with estado.trava:                      # o motor compartilha cache com o chat
+            resultado = estado.raciocinio.analisar(mensagem, [])
+        candidatos_info = []
+        for c in resultado.todos_candidatos[:5]:
+            candidatos_info.append({
+                'titulo': c.titulo,
+                'categoria': c.categoria,
+                'score': round(c.score_final, 2),
+                'evidencias': c.keywords_que_batem[:6],
+                'parametros': {
+                    k: round(v, 3) for k, v in c.valores_param.items() if v != 0
+                },
+            })
+        return jsonify({
+            'mensagem': mensagem,
+            'tipo_pergunta': resultado.analise.tipo_pergunta,
+            'categoria_detectada': resultado.analise.categoria_detectada,
+            'termos_extraidos': resultado.analise.termos,
+            'nivel_confianca': resultado.nivel_confianca,
+            'margem_lideranca': round(resultado.margem_lideranca, 2),
+            'vencedor': resultado.vencedor.titulo if resultado.vencedor else None,
+            'relacionados': resultado.topicos_relacionados,
+            'sugestoes': resultado.sugestoes_proximas,
+            'top5_candidatos': candidatos_info,
+            'explicacao': resultado.explicacao_debug,
+        })
+
+    @app.route("/db_status", methods=["GET"])
+    def db_status():
+        """Endpoint de diagnóstico do banco SQLite (v0.3.0 Beta)"""
+        exigir_diagnostico()
+        try:
+            tabelas = listar_tabelas()
+            total_registros = contar_registros()
+            return jsonify({
+                "banco": os.path.basename(cfg.db_path),
+                "status": "ok",
+                "tabelas": tabelas,
+                "knowledge_registros": total_registros
+            })
+        except Exception:
+            logger.exception("Erro ao verificar banco")
+            return jsonify({"status": "erro", "detalhe": "Falha ao consultar o banco de dados"}), 500
+
+
+# ============================================================================
+# Execução
+# ============================================================================
+
+def deve_inicializar(cfg: Config, environ=None) -> bool:
+    """
+    O recarregador do Werkzeug (modo debug) executa este script DUAS vezes: um processo "pai",
+    que só vigia os arquivos, e um "filho" (WERKZEUG_RUN_MAIN=true), que atende as requisições.
+    Só o filho — ou qualquer execução sem recarregador — deve criar tabelas e rodar seeds;
+    antes, tudo rodava duas vezes.
+    """
+    environ = os.environ if environ is None else environ
+    return not (cfg.debug and environ.get("WERKZEUG_RUN_MAIN") != "true")
+
+
+def main() -> int:
     try:
-        if nome_usuario in historico_conversas:
-            del historico_conversas[nome_usuario]
-            return jsonify({"mensagem": f"Histórico de {nome_usuario} limpo com sucesso"})
-        else:
-            return jsonify({"mensagem": "Usuário não encontrado"}), 404
-    except Exception as e:
-        logger.error(f"Erro ao limpar histórico: {e}")
-        return jsonify({"erro": "Erro ao limpar histórico"}), 500
+        cfg = Config.from_env()
+    except ConfigError as erro:
+        print(f"\n[XBot] Não foi possível iniciar — configuração inválida:\n\n{erro}\n", file=sys.stderr)
+        return 2
 
-@app.errorhandler(404)
-def not_found(error):
-    """Handler para erro 404"""
-    return jsonify({"erro": "Endpoint não encontrado"}), 404
+    if cfg.producao and cfg.host_na_rede:
+        # `python app.py` usa o servidor de DESENVOLVIMENTO do Flask: em produção ele só atende em localhost.
+        print(
+            f"\n[XBot] XBOT_HOST={cfg.host} em modo produção colocaria o servidor de desenvolvimento do "
+            "Flask na rede, e ele não foi feito para isso.\n"
+            "  - Uso local: deixe XBOT_HOST=127.0.0.1 (padrão).\n"
+            "  - Para atender a rede/Internet: use um servidor de produção com o wsgi.py, por exemplo\n"
+            "        waitress-serve --listen=0.0.0.0:8000 wsgi:app\n"
+            "    com um proxy HTTPS na frente (veja o README).\n"
+            "  - Só para testar na rede local: rode com XBOT_ENV=development.\n",
+            file=sys.stderr,
+        )
+        return 2
 
-@app.errorhandler(500)
-def internal_error(error):
-    """Handler para erro 500"""
-    return jsonify({"erro": "Erro interno do servidor"}), 500
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    servindo = deve_inicializar(cfg)
+
+    if cfg.secret_efemera and cfg.debug and "WERKZEUG_RUN_MAIN" not in os.environ:
+        # chave temporária de desenvolvimento: o processo filho do recarregador herda a MESMA,
+        # para os logins sobreviverem aos recarregamentos de código
+        os.environ["XBOT_SECRET_KEY"] = cfg.secret_key
+
+    app = create_app(cfg, inicializar=servindo)
+
+    if servindo:
+        logger.info("Iniciando XBot v0.3.0 Beta... (%s)", cfg.resumo())
+        for aviso in cfg.avisos:
+            logger.warning(aviso)
+        logger.info("Tópicos de conhecimento carregados: %d",
+                    len(app.extensions["xbot"].bot.get_available_topics()))
+        endereco = "localhost" if cfg.host in ("0.0.0.0", "::") else cfg.host
+        logger.info("Acesse: http://%s:%d", endereco, cfg.port)
+
+    app.run(host=cfg.host, port=cfg.port, debug=cfg.debug, use_reloader=cfg.debug, threaded=True)
+    return 0
+
+
+_app_padrao: Optional[Flask] = None
+
+
+def __getattr__(nome: str):
+    """
+    `from app import app` (gunicorn app:app, flask --app app run) cria a aplicação sob demanda.
+    Importar este módulo NÃO toca no banco nem exige a chave — por isso os testes e
+    ferramentas podem importar `create_app` à vontade.
+    """
+    global _app_padrao
+    if nome == "app":
+        if _app_padrao is None:
+            _app_padrao = create_app()
+        return _app_padrao
+    raise AttributeError(f"module {__name__!r} has no attribute {nome!r}")
+
 
 if __name__ == "__main__":
-    logger.info("Iniciando XBot v2.1...")
-    logger.info(f"Tópicos de conhecimento carregados: {len(xbot.get_available_topics())}")
-    
-    # Configuração para produção vs desenvolvimento
-    debug_mode = True  # Alterar para False em produção
-    
-    app.run(
-        host='0.0.0.0', 
-        port=5000, 
-        debug=debug_mode,
-        threaded=True
-    )
-
+    sys.exit(main())

@@ -15,10 +15,45 @@
             <h2>🤖 XBot <span class="status-indicator" aria-label="Status online"></span></h2>
             <small>Assistente Virtual Inteligente</small>
         </div>
-        <div>
+        <div class="header-actions">
+            <span id="sessao-badge" class="sessao-badge" hidden></span>
+            <button id="btn-auth" class="btn-secondary" aria-label="Entrar ou cadastrar">
+                👤 Entrar
+            </button>
             <button id="btn-tema" title="Alternar tema" aria-label="Alternar entre modo claro e escuro">🌓</button>
             <button id="btn-limpar" class="btn-secondary" title="Limpar conversa" aria-label="Limpar conversa">🗑️</button>
             <button id="btn-exportar" class="btn-secondary" title="Exportar conversa" aria-label="Exportar conversa">💾</button>
+        </div>
+    </div>
+
+    <!-- Modal de autenticação (v0.3.0 Beta) -->
+    <div id="auth-modal" class="auth-modal-overlay" hidden>
+        <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+            <button id="auth-modal-fechar" class="auth-modal-fechar" aria-label="Fechar">✕</button>
+
+            <h3 id="auth-modal-title">Entrar no XBot</h3>
+            <p class="auth-modal-subtitle">Cadastre-se gratuitamente e tenha acesso completo, sem limite de tempo.</p>
+
+            <div class="auth-tabs">
+                <button id="auth-tab-login" class="auth-tab active">Entrar</button>
+                <button id="auth-tab-registrar" class="auth-tab">Cadastrar</button>
+            </div>
+
+            <form id="form-login" class="auth-form">
+                <input type="email" id="login-email" placeholder="E-mail" autocomplete="email" required>
+                <input type="password" id="login-senha" placeholder="Senha" autocomplete="current-password" required maxlength="256">
+                <button type="submit" class="btn-primary">Entrar</button>
+                <p class="auth-erro" id="login-erro" hidden></p>
+            </form>
+
+            <form id="form-registrar" class="auth-form" hidden>
+                <input type="text" id="registrar-nome" placeholder="Seu nome" autocomplete="name" required>
+                <input type="email" id="registrar-email" placeholder="E-mail" autocomplete="email" required>
+                <input type="password" id="registrar-senha" placeholder="Senha (mín. 10 caracteres)" autocomplete="new-password" required minlength="10" maxlength="128" aria-describedby="registrar-senha-dica">
+                <small id="registrar-senha-dica" class="auth-dica">Use 10 ou mais caracteres, com letras e pelo menos um número ou símbolo. Evite senhas comuns e seu nome ou e-mail.</small>
+                <button type="submit" class="btn-primary">Criar conta gratuita</button>
+                <p class="auth-erro" id="registrar-erro" hidden></p>
+            </form>
         </div>
     </div>
 
