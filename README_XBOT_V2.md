@@ -1,6 +1,4 @@
-# XBot v2.1 — histórico da versão anterior
-
-> Este documento descreve a versão anterior. A versão atual é o [XBot v0.3.0 Beta](README_XBOT_V0.3.0.md), com autenticação, SQLite e revisão de segurança.
+# XBot v2.1 — assistente educacional
 
 **Branch:** [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual)
 
@@ -66,4 +64,6 @@ A execução atual guarda histórico e métricas em estruturas na memória, sem 
 
 ## Diferença em relação ao Jarvis original
 
-O Jarvis, na branch [`main`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main), é um frontend de assistente com voz do navegador, perfil, comandos personalizados e armazenamento local. O XBot adiciona uma camada de servidor em Python, conteúdo educacional temático, quizzes, exercícios e endpoints HTTP. A comparação geral está no [README principal](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/blob/main/README.md).
+O Jarvis, na branch [`main`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main), é um frontend de assistente com voz do navegador, perfil, comandos personalizados e armazenamento local. O XBot 2.1 acrescenta uma camada de servidor Python/Flask, conteúdo educacional, quizzes e exercícios.
+
+O XBot 2.1 permanece em [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual). A versão mais nova, [XBot v0.3.0 Beta](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-v0.3.0), está em branch separada e acrescenta contas, SQLite, teste de visitante e proteções de segurança. Veja o [guia v0.3.0](README_XBOT_V0.3.0.md) e o [comparativo dos três projetos](README.md).

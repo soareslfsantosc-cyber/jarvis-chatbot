@@ -35,7 +35,7 @@ Abra <http://localhost:8000>. Não há instalação de dependências Python para
 
 ## Diferença em relação ao XBot
 
-O Jarvis original trabalha principalmente no cliente, com APIs de voz do navegador e armazenamento local. O XBot v0.3.0 Beta, na branch [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual), acrescenta backend Python/Flask, SQLite, contas, quizzes, exercícios e proteções de sessão. Veja o [guia atual do XBot](README_XBOT_V0.3.0.md).
+O Jarvis original funciona no navegador, com voz e dados locais. O repositório também mantém duas versões Flask separadas: [XBot 2.1 em `xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual) e [XBot v0.3.0 em `xbot-v0.3.0`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-v0.3.0). A v0.3.0 acrescenta autenticação, SQLite e controles de segurança ao XBot 2.1. Consulte o [comparativo dos três](README.md), o [guia v2.1](README_XBOT_V2.md) e o [guia v0.3.0](README_XBOT_V0.3.0.md).
 
 ## Observação sobre os arquivos existentes
 

@@ -1,53 +1,60 @@
-# Jarvis Chatbot + XBot v0.3.0 Beta
+# Jarvis Chatbot, XBot 2.1 e XBot v0.3.0 Beta
 
-Este repositório reúne **dois projetos distintos**: o Jarvis original, executado no navegador, e o XBot educacional, com backend Python/Flask. O XBot v0.3.0 adiciona contas, persistência SQLite e uma revisão ampla de segurança.
+O repositório contém **três versões/projetos relacionados**, preservados em branches distintas: o Jarvis original, o XBot 2.1 e sua evolução XBot v0.3.0 Beta.
 
 ## Projetos e branches
 
-| Projeto | Branch | Localização | Guia |
+| Projeto | Branch | Localização | Documentação |
 |---|---|---|---|
-| Jarvis original | [`main`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main) | arquivos web na raiz | [README do Jarvis](README_JARVIS_ORIGINAL.md) |
-| XBot v0.3.0 Beta | [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual) | `xbot_melhorado/` | [Guia do XBot v0.3.0](README_XBOT_V0.3.0.md) |
+| Jarvis original | [`main`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/main) | arquivos web na raiz | [Guia do Jarvis](README_JARVIS_ORIGINAL.md) |
+| XBot 2.1 | [`xbot-atual`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-atual) | `xbot_melhorado/` | [Guia do XBot 2.1](README_XBOT_V2.md) |
+| XBot v0.3.0 Beta | [`xbot-v0.3.0`](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/tree/xbot-v0.3.0) | `xbot_melhorado/` | [Guia do XBot v0.3.0](README_XBOT_V0.3.0.md) |
 
-## Comparativo
+## Comparativo dos três
 
-| Aspecto | Jarvis original (`main`) | XBot v0.3.0 (`xbot-atual`) |
-|---|---|---|
-| Execução | HTML, CSS e JavaScript no navegador | Aplicação Python/Flask com interface web |
-| Respostas | Comandos e lógica locais; voz via APIs do navegador | Motor local de raciocínio e busca em conhecimento SQLite; sem API externa de IA generativa |
-| Foco | Assistente geral, comandos e conversa por voz | Arquitetura de computadores, programação e web design; quizzes e exercícios |
-| Contas e acesso | Perfil e configurações guardados no `localStorage` do navegador | Cadastro e login; visitantes recebem uma prévia de 10 minutos |
-| Persistência | Preferências e histórico local no navegador | SQLite para usuários, conhecimento e limites; histórico do chat e quizzes ativos ficam na memória do processo |
-| Segurança | Recursos dependem do navegador e do armazenamento local | Chave obrigatória em produção, hash de senhas, limites de login/cadastro, CSRF, CORS por allowlist, validação de entradas e cabeçalhos de segurança |
+| Aspecto | Jarvis original (`main`) | XBot 2.1 (`xbot-atual`) | XBot v0.3.0 Beta (`xbot-v0.3.0`) |
+|---|---|---|---|
+| Execução | HTML, CSS e JavaScript no navegador | Python/Flask com frontend web | Python/Flask com frontend web e configuração por ambiente |
+| Respostas | Lógica local, comandos e APIs de voz do navegador | Regras/regex e bases de conhecimento locais | Motor de raciocínio e busca de conhecimento local em SQLite; sem API externa de IA generativa |
+| Foco | Assistente geral, voz, perfil e comandos | Conteúdo educacional, arquitetura, programação e web; quizzes e exercícios | Mantém os recursos educacionais e acrescenta contas, teste de visitante e controles de segurança |
+| Dados e usuários | Preferências e histórico no `localStorage` do navegador | Histórico e estatísticas mantidos em memória; sem contas persistentes | SQLite para contas, conhecimento e limites; históricos e quizzes ativos permanecem em memória |
+| Segurança e execução | Depende do navegador/dispositivo | Servidor de desenvolvimento; use apenas localmente até configurar implantação apropriada | Hash de senhas, limites de login/cadastro, CSRF, CORS configurável, cookies protegidos e chave secreta obrigatória em produção |
 
-## O que mudou no XBot
+## O que mudou do XBot 2.1 para o v0.3.0
 
-A versão 0.3.0 Beta substitui o servidor anterior por uma aplicação Flask única e acrescenta:
+A v0.3.0 é uma **versão separada**, não uma substituição do XBot 2.1. Ela acrescenta autenticação, prévia de 10 minutos para visitantes, persistência SQLite, controles de sessão, proteção CSRF, CORS por allowlist, limites contra tentativas repetidas e uma configuração de produção com chave secreta e entrada WSGI. O branch `xbot-atual` continua guardando o XBot 2.1; a versão v0.3.0 está em `xbot-v0.3.0`.
 
-- autenticação com política de senha, bloqueio de tentativas repetidas e limite de cadastros;
-- limite de uso de visitantes acompanhado no servidor, não apenas por cookie;
-- armazenamento SQLite de contas, conhecimento e controles de abuso;
-- proteção CSRF e validação de `Origin`/`Referer`, CORS limitado a origens configuradas e cookies `HttpOnly`/`SameSite`;
-- chave secreta obrigatória em produção, debug restrito a desenvolvimento local e orientação WSGI para publicação;
-- testes automatizados de rotas, sessão, autenticação, segurança e inicialização.
-
-**Validação desta publicação:** os 306 testes da suíte passaram em ambiente isolado. O Jarvis original continua na branch `main`; nenhum código do Jarvis foi substituído.
+Os dois XBots usam conhecimento e raciocínio locais; nenhum dos dois integra uma API externa de IA generativa. No XBot v0.3.0, o histórico do chat e o progresso de quizzes continuam em memória e são reiniciados quando o servidor reinicia.
 
 ## Executar localmente
 
 ### Jarvis original
 
-Na branch `main`, na raiz:
+Na branch `main`, na raiz do repositório:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Abra <http://localhost:8000>. O uso de voz depende do suporte e da permissão de microfone do navegador.
+Abra <http://localhost:8000>. O uso de voz depende do navegador e da permissão do microfone.
 
-### XBot v0.3.0 — desenvolvimento local
+### XBot 2.1
 
 Na branch `xbot-atual`:
+
+```bash
+cd xbot_melhorado
+python3 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+pip install -r requirements.txt
+python app_improved.py
+```
+
+Abra <http://localhost:5000>. O modo debug é destinado ao desenvolvimento local; não exponha o servidor embutido diretamente à internet.
+
+### XBot v0.3.0 Beta
+
+Na branch `xbot-v0.3.0`:
 
 ```bash
 cd xbot_melhorado
@@ -57,14 +64,12 @@ pip install -r requirements.txt
 XBOT_ENV=development python app.py
 ```
 
-No Windows PowerShell, ative com `.venv\Scripts\Activate.ps1` e defina `$env:XBOT_ENV = "development"` antes de executar `python app.py`. Acesse <http://127.0.0.1:5000>.
+Abra <http://127.0.0.1:5000>. Para produção, configure `XBOT_SECRET_KEY`, use Waitress ou Gunicorn por WSGI e coloque HTTPS/proxy à frente. Consulte o [guia v0.3.0](README_XBOT_V0.3.0.md).
 
-Para produção, configure `XBOT_SECRET_KEY`, use `wsgi.py` com Waitress ou Gunicorn e coloque HTTPS/proxy à frente. **Não exponha o servidor de desenvolvimento/debug.** Consulte o [guia detalhado do XBot](README_XBOT_V0.3.0.md).
-
-## Documentação
+## Documentação complementar
 
 - [Jarvis original](README_JARVIS_ORIGINAL.md)
-- [XBot v0.3.0 Beta — comparativo, instalação, API e segurança](README_XBOT_V0.3.0.md)
-- [README v0.3.0 incluído no projeto](https://github.com/soareslfsantosc-cyber/jarvis-chatbot/blob/xbot-atual/xbot_melhorado/README_V0.3.0.md)
-- `README_XBOT_V2.md` — documentação histórica da versão 2.1.
-- `xbot_melhorado/README.md` — README existente preservado como estava antes da atualização.
+- [XBot 2.1](README_XBOT_V2.md)
+- [XBot v0.3.0 Beta](README_XBOT_V0.3.0.md)
+- `xbot_melhorado/README.md` na branch `xbot-atual` continua sendo o README original do XBot 2.1.
+- Na branch `xbot-v0.3.0`, o README anterior também foi preservado; o guia recebido com essa versão está em `xbot_melhorado/README_V0.3.0.md`.
