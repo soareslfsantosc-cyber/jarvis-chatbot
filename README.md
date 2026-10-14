@@ -73,3 +73,9 @@ Abra <http://127.0.0.1:5000>. Para produção, configure `XBOT_SECRET_KEY`, use 
 - [XBot v0.3.0 Beta](README_XBOT_V0.3.0.md)
 - `xbot_melhorado/README.md` na branch `xbot-atual` continua sendo o README original do XBot 2.1.
 - Na branch `xbot-v0.3.0`, o README anterior também foi preservado; o guia recebido com essa versão está em `xbot_melhorado/README_V0.3.0.md`.
+
+## Licença
+
+O material original do repositório está sob a [licença personalizada para estudo, pesquisa, ensino e referência não comercial](LICENSE). Ela permite copiar, adaptar e compartilhar apenas para esses fins, com os avisos de autoria mantidos; **uso comercial, venda, monetização e implantação operacional/comercial não são permitidos sem autorização escrita**. Esta não é uma licença MIT. Componentes de terceiros permanecem sujeitos às respectivas licenças.
+
+É uma licença personalizada, não uma licença open source aprovada pela OSI; a aplicação e a interpretação dos termos dependem da legislação aplicável. Para uma proteção jurídica específica, considere revisão por um profissional do direito.
